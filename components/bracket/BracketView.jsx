@@ -21,21 +21,21 @@ export default function BracketView({ matchups, status, voterId, votedMatchupIds
   const owner2R2Ref = useRef(null);
   const owner2R1Ref = useRef(null);
 
-  // Drag-to-scroll functionality (horizontal only — does not block vertical page scroll)
+  // Drag-to-scroll: horizontal drag scrolls the bracket container,
+  // vertical drag scrolls the page — both work within the same drag area.
   const scrollContainerRef = useRef(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const dragLocked   = useRef(false); // true once we've committed to horizontal scroll
+  const [isDragging, setIsDragging]   = useState(false);
+  const dragDir      = useRef(null);   // 'h' | 'v' | null
   const startXRef    = useRef(0);
-  const startYRef    = useRef(0);
+  const startYRef    = useRef(0);      // updated each frame for incremental vertical scroll
   const scrollLeftRef = useRef(0);
 
   const handleMouseDown = (e) => {
     if (!scrollContainerRef.current) return;
-    // Record start position but don't commit to drag yet
-    dragLocked.current = false;
+    dragDir.current = null;
     setIsDragging(true);
-    startXRef.current    = e.pageX - scrollContainerRef.current.offsetLeft;
-    startYRef.current    = e.pageY;
+    startXRef.current     = e.pageX - scrollContainerRef.current.offsetLeft;
+    startYRef.current     = e.pageY;
     scrollLeftRef.current = scrollContainerRef.current.scrollLeft;
   };
 
@@ -45,19 +45,22 @@ export default function BracketView({ matchups, status, voterId, votedMatchupIds
     const dx = Math.abs(e.pageX - (startXRef.current + scrollContainerRef.current.offsetLeft));
     const dy = Math.abs(e.pageY - startYRef.current);
 
-    if (!dragLocked.current) {
-      // Not enough movement yet — wait for clear intent
+    // Wait for at least 4 px of movement before committing to a direction
+    if (!dragDir.current) {
       if (dx < 4 && dy < 4) return;
-      // If vertical movement dominates, release the drag so the page can scroll
-      if (dy > dx) {
-        setIsDragging(false);
-        return;
-      }
-      // Horizontal movement dominates — lock into horizontal drag scroll
-      dragLocked.current = true;
+      dragDir.current = dy > dx ? 'v' : 'h';
     }
 
-    e.preventDefault(); // Only called once drag direction is confirmed as horizontal
+    if (dragDir.current === 'v') {
+      // Vertical: scroll the page by the incremental delta each frame
+      const delta = startYRef.current - e.pageY;
+      startYRef.current = e.pageY; // reset so next frame is incremental
+      window.scrollBy(0, delta);
+      return;
+    }
+
+    // Horizontal: scroll the bracket container
+    e.preventDefault();
     const x    = e.pageX - scrollContainerRef.current.offsetLeft;
     const walk = (x - startXRef.current) * 2;
     scrollContainerRef.current.scrollLeft = scrollLeftRef.current - walk;
@@ -65,26 +68,16 @@ export default function BracketView({ matchups, status, voterId, votedMatchupIds
 
   const handleMouseUp = () => {
     setIsDragging(false);
-    dragLocked.current = false;
+    dragDir.current = null;
   };
 
   const handleMouseLeave = () => {
     setIsDragging(false);
-    dragLocked.current = false;
+    dragDir.current = null;
   };
 
-  // Scroll only the bracket container horizontally — never touches window.scrollY
   const scrollToRound = (ref) => {
-    if (!ref.current || !scrollContainerRef.current) return;
-    const container = scrollContainerRef.current;
-    const containerRect = container.getBoundingClientRect();
-    const targetRect   = ref.current.getBoundingClientRect();
-    // Distance from left edge of container to centre of target column, then subtract half container width
-    const scrollTo = container.scrollLeft
-      + (targetRect.left - containerRect.left)
-      + targetRect.width / 2
-      - containerRect.width / 2;
-    container.scrollTo({ left: Math.max(0, scrollTo), behavior: 'smooth' });
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   };
 
   return (
@@ -125,7 +118,7 @@ export default function BracketView({ matchups, status, voterId, votedMatchupIds
         <div className="w-full px-4">
           <div
             ref={scrollContainerRef}
-            className={`flex gap-8 overflow-x-auto pb-40 select-none ${
+            className={`flex gap-8 overflow-x-auto pb-64 select-none ${
               isDragging ? 'cursor-grabbing' : 'cursor-grab'
             }`}
             onMouseDown={handleMouseDown}
