@@ -3,7 +3,11 @@
 import { useState, useEffect } from 'react';
 
 export default function BracketPage() {
-  // Data structure: { name: string, rank: number, addedBy?: 'owner1' | 'owner2' }
+  // API Connection Status
+  const [apiConnected, setApiConnected] = useState(false);
+  const [apiChecking, setApiChecking] = useState(true);
+
+  // Data structure: { name: string, rank: number, isShared?: boolean, addedBy?: 'owner1' | 'owner2' }
   const [owner1Names, setOwner1Names] = useState([]);
   const [owner2Names, setOwner2Names] = useState([]);
   const [sharedNames, setSharedNames] = useState([]);
@@ -11,8 +15,37 @@ export default function BracketPage() {
   const [owner2Input, setOwner2Input] = useState('');
   const [owner1Error, setOwner1Error] = useState('');
   const [owner2Error, setOwner2Error] = useState('');
+  
+  // Lock-in status tracking
+  const [owner1LockedIn, setOwner1LockedIn] = useState(false);
+  const [owner2LockedIn, setOwner2LockedIn] = useState(false);
+  const [bracketStatus, setBracketStatus] = useState('draft');
+  const [showCelebration, setShowCelebration] = useState(false);
 
   const MAX_NAMES = 16;
+
+  // Check API connection on mount
+  useEffect(() => {
+    const checkAPIConnection = async () => {
+      try {
+        const response = await fetch('http://localhost:3001/health');
+        if (response.ok) {
+          const data = await response.json();
+          console.log('API Health Check:', data);
+          setApiConnected(true);
+        } else {
+          setApiConnected(false);
+        }
+      } catch (error) {
+        console.error('API Connection Error:', error);
+        setApiConnected(false);
+      } finally {
+        setApiChecking(false);
+      }
+    };
+
+    checkAPIConnection();
+  }, []);
 
   // Helper function for case-insensitive comparison
   const normalizeNameForComparison = (name) => name.toLowerCase().trim();
@@ -85,94 +118,185 @@ export default function BracketPage() {
     setOwner2Error('');
   }, [owner2Input, owner2Names, sharedNames]);
 
+  // Fetch bracket data from API and update state
+  const fetchBracketData = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/bracket/current');
+      if (response.ok) {
+        const data = await response.json();
+        
+        // API returns owner1Names, owner2Names, sharedNames at top level
+        if (data.owner1Names || data.owner2Names || data.sharedNames) {
+          // Transform API data to frontend state format with ranks and IDs
+          const owner1Data = (data.owner1Names || []).map((item, index) => ({
+            id: item.id,
+            name: item.value,
+            rank: index + 1,
+            isShared: item.isShared || false
+          }));
+          
+          const owner2Data = (data.owner2Names || []).map((item, index) => ({
+            id: item.id,
+            name: item.value,
+            rank: index + 1,
+            isShared: item.isShared || false
+          }));
+          
+          const sharedData = (data.sharedNames || []).map((item, index) => ({
+            id: item.id,
+            name: item.value,
+            rank: index + 1,
+            addedBy: item.submittedBy === 'Owner 1' ? 'owner1' : 'owner2'
+          }));
+          
+          setOwner1Names(owner1Data);
+          setOwner2Names(owner2Data);
+          setSharedNames(sharedData);
+          
+          // Update lock-in states and bracket status
+          setOwner1LockedIn(data.owner1LockedIn || false);
+          setOwner2LockedIn(data.owner2LockedIn || false);
+          setBracketStatus(data.status || 'draft');
+          
+          // Show celebration if both just locked in
+          if (data.owner1LockedIn && data.owner2LockedIn && data.status === 'active') {
+            setShowCelebration(true);
+            setTimeout(() => setShowCelebration(false), 5000);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching bracket data:', error);
+    }
+  };
+
+  // Load bracket data on mount
+  useEffect(() => {
+    if (apiConnected) {
+      fetchBracketData();
+    }
+  }, [apiConnected]);
+
   // Handle adding name for Owner 1
-  const handleAddOwner1 = (e) => {
+  const handleAddOwner1 = async (e) => {
     e.preventDefault();
     const trimmedName = owner1Input.trim();
     
     if (!trimmedName || owner1Error) return;
     
-    const normalizedInput = normalizeNameForComparison(trimmedName);
+    try {
+      const response = await fetch('http://localhost:3001/api/names', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: trimmedName,
+          owner: 'Owner 1'
+        })
+      });
 
-    // DUPLICATE RULE: Check if name exists in Owner 2's list (case-insensitive)
-    const existsInOwner2 = owner2Names.find(item => normalizeNameForComparison(item.name) === normalizedInput);
-    if (existsInOwner2) {
-      // Remove from Owner 2's list (they added it first, so they were the original)
-      setOwner2Names(owner2Names.filter(item => normalizeNameForComparison(item.name) !== normalizedInput));
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Handle error from backend
+        setOwner1Error(data.error || 'Failed to add name');
+        return;
+      }
+
+      // Success! Refresh bracket data from server
+      await fetchBracketData();
       
-      // Add to shared list with metadata showing Owner 2 added it first
-      // Use the ORIGINAL casing from Owner 2's entry
-      const nextSharedRank = sharedNames.length + 1;
-      setSharedNames([...sharedNames, { 
-        name: existsInOwner2.name, // Use Owner 2's original casing
-        rank: nextSharedRank,
-        addedBy: 'owner2' // Owner 2 added it first
-      }]);
-      
+      // Clear input
       setOwner1Input('');
-      return;
+      setOwner1Error('');
+      
+    } catch (error) {
+      console.error('Error adding name:', error);
+      setOwner1Error('Failed to connect to server');
     }
-
-    // Add to Owner 1's list with rank
-    const nextRank = owner1Names.length + 1;
-    setOwner1Names([...owner1Names, { name: trimmedName, rank: nextRank }]);
-    setOwner1Input('');
   };
 
   // Handle adding name for Owner 2
-  const handleAddOwner2 = (e) => {
+  const handleAddOwner2 = async (e) => {
     e.preventDefault();
     const trimmedName = owner2Input.trim();
     
     if (!trimmedName || owner2Error) return;
     
-    const normalizedInput = normalizeNameForComparison(trimmedName);
+    try {
+      const response = await fetch('http://localhost:3001/api/names', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: trimmedName,
+          owner: 'Owner 2'
+        })
+      });
 
-    // DUPLICATE RULE: Check if name exists in Owner 1's list (case-insensitive)
-    const existsInOwner1 = owner1Names.find(item => normalizeNameForComparison(item.name) === normalizedInput);
-    if (existsInOwner1) {
-      // Remove from Owner 1's list (they added it first, so they were the original)
-      setOwner1Names(owner1Names.filter(item => normalizeNameForComparison(item.name) !== normalizedInput));
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Handle error from backend
+        setOwner2Error(data.error || 'Failed to add name');
+        return;
+      }
+
+      // Success! Refresh bracket data from server
+      await fetchBracketData();
       
-      // Add to shared list with metadata showing Owner 1 added it first
-      // Use the ORIGINAL casing from Owner 1's entry
-      const nextSharedRank = sharedNames.length + 1;
-      setSharedNames([...sharedNames, { 
-        name: existsInOwner1.name, // Use Owner 1's original casing
-        rank: nextSharedRank,
-        addedBy: 'owner1' // Owner 1 added it first
-      }]);
-      
+      // Clear input
       setOwner2Input('');
-      return;
+      setOwner2Error('');
+      
+    } catch (error) {
+      console.error('Error adding name:', error);
+      setOwner2Error('Failed to connect to server');
     }
-
-    // Add to Owner 2's list with rank
-    const nextRank = owner2Names.length + 1;
-    setOwner2Names([...owner2Names, { name: trimmedName, rank: nextRank }]);
-    setOwner2Input('');
   };
 
-  // Remove name from owner lists and recalculate ranks
-  const removeFromOwner1 = (name) => {
-    const filtered = owner1Names.filter(item => item.name !== name);
-    // Recalculate ranks
-    const reranked = filtered.map((item, index) => ({ ...item, rank: index + 1 }));
-    setOwner1Names(reranked);
+  // Delete name from backend and refresh data
+  const handleDeleteName = async (nameId) => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/names/${nameId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        // Success! Refresh the bracket data to update UI and ranks
+        await fetchBracketData();
+      } else {
+        const data = await response.json();
+        console.error('Failed to delete name:', data.error || 'Unknown error');
+      }
+    } catch (error) {
+      console.error('Error deleting name:', error);
+    }
   };
 
-  const removeFromOwner2 = (name) => {
-    const filtered = owner2Names.filter(item => item.name !== name);
-    // Recalculate ranks
-    const reranked = filtered.map((item, index) => ({ ...item, rank: index + 1 }));
-    setOwner2Names(reranked);
-  };
+  // Handle lock-in for owners
+  const handleLockIn = async (owner) => {
+    try {
+      const response = await fetch('http://localhost:3001/api/bracket/lock-in', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ owner })
+      });
 
-  const removeFromShared = (name) => {
-    const filtered = sharedNames.filter(item => item.name !== name);
-    // Recalculate ranks
-    const reranked = filtered.map((item, index) => ({ ...item, rank: index + 1 }));
-    setSharedNames(reranked);
+      if (response.ok) {
+        // Success! Refresh bracket data to update lock states
+        await fetchBracketData();
+      } else {
+        const data = await response.json();
+        console.error('Failed to lock in:', data.error || 'Unknown error');
+      }
+    } catch (error) {
+      console.error('Error locking in:', error);
+    }
   };
 
   return (
@@ -180,12 +304,35 @@ export default function BracketPage() {
       <div className="max-w-7xl mx-auto">
         {/* Page Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground mb-4">
-            Name Submission Dashboard
-          </h1>
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">
+              Name Submission Dashboard
+            </h1>
+            {/* API Connection Status Badge */}
+            {!apiChecking && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
+                <div className={`w-2 h-2 rounded-full ${apiConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                <span className={`text-xs font-medium ${apiConnected ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
+                  {apiConnected ? 'API Connected' : 'API Offline'}
+                </span>
+              </div>
+            )}
+          </div>
           <p className="text-lg text-gray-600 dark:text-gray-400">
-            Each parent adds up to {MAX_NAMES} names. Duplicates automatically move to Shared Favorites!
+            {bracketStatus === 'draft'
+              ? `Each parent adds up to ${MAX_NAMES} names. Duplicates automatically move to Shared Favorites!`
+              : 'Both parents have locked in their names! The bracket is now active for voting.'
+            }
           </p>
+          
+          {/* Celebration Message */}
+          {showCelebration && (
+            <div className="mt-6 mx-auto max-w-2xl bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-4 rounded-lg shadow-lg animate-bounce">
+              <p className="text-center text-xl font-bold">
+                🎉 Both parents have locked in! The tournament is now active! 🎉
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Three Column Grid */}
@@ -199,32 +346,55 @@ export default function BracketPage() {
               {owner1Names.length} / {MAX_NAMES} names
             </p>
 
-            {/* Input Form */}
-            <form onSubmit={handleAddOwner1} className="mb-6">
-              <input
-                type="text"
-                value={owner1Input}
-                onChange={(e) => setOwner1Input(e.target.value)}
-                placeholder="Enter a baby name..."
-                className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-800 text-foreground focus:outline-none focus:ring-2 ${
-                  owner1Error 
-                    ? 'border-red-500 focus:ring-red-500' 
-                    : 'border-gray-300 dark:border-gray-700 focus:ring-foreground'
-                }`}
-              />
-              {owner1Error && (
-                <p className="mt-2 text-sm text-red-600 dark:text-red-400">
-                  {owner1Error}
+            {/* Input Form or Locked State */}
+            {!owner1LockedIn ? (
+              <>
+                <form onSubmit={handleAddOwner1} className="mb-4">
+                  <input
+                    type="text"
+                    value={owner1Input}
+                    onChange={(e) => setOwner1Input(e.target.value)}
+                    placeholder="Enter a baby name..."
+                    className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-800 text-foreground focus:outline-none focus:ring-2 ${
+                      owner1Error
+                        ? 'border-red-500 focus:ring-red-500'
+                        : 'border-gray-300 dark:border-gray-700 focus:ring-foreground'
+                    }`}
+                  />
+                  {owner1Error && (
+                    <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                      {owner1Error}
+                    </p>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={!owner1Input.trim() || !!owner1Error}
+                    className="mt-3 w-full px-4 py-2 bg-foreground text-background rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Add Name
+                  </button>
+                </form>
+                
+                {/* Lock In Button */}
+                <button
+                  onClick={() => handleLockIn('Owner 1')}
+                  disabled={owner1Names.length === 0}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-bold hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md mb-6"
+                >
+                  🔒 Lock In My Names
+                </button>
+              </>
+            ) : (
+              <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-600 rounded-lg">
+                <div className="flex items-center justify-center gap-2 text-green-700 dark:text-green-400">
+                  <span className="text-2xl">✅</span>
+                  <span className="font-bold text-lg">Names Locked In!</span>
+                </div>
+                <p className="text-center text-sm text-green-600 dark:text-green-500 mt-2">
+                  {owner2LockedIn ? 'Both parents ready! Bracket is active.' : 'Waiting for Wife to lock in...'}
                 </p>
-              )}
-              <button
-                type="submit"
-                disabled={!owner1Input.trim() || !!owner1Error}
-                className="mt-3 w-full px-4 py-2 bg-foreground text-background rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Add Name
-              </button>
-            </form>
+              </div>
+            )}
 
             {/* Names List (sorted by rank) */}
             <div className="space-y-2">
@@ -233,20 +403,57 @@ export default function BracketPage() {
                 .map((item) => (
                   <div
                     key={`owner1-${item.name}`}
-                    className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                    className={`flex items-center justify-between px-3 py-2 rounded-lg ${
+                      item.isShared
+                        ? 'bg-purple-50 dark:bg-purple-900/30 border-2 border-purple-300 dark:border-purple-700'
+                        : 'bg-gray-50 dark:bg-gray-800'
+                    }`}
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
+                      <span className={`text-xs font-bold px-2 py-1 rounded ${
+                        item.isShared
+                          ? 'text-purple-600 dark:text-purple-400 bg-purple-200 dark:bg-purple-900/60'
+                          : 'text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700'
+                      }`}>
                         #{item.rank}
                       </span>
-                      <span className="text-foreground">{item.name}</span>
+                      <div className="flex items-center gap-2">
+                        {item.isShared && (
+                          <span className="text-purple-500" title="Shared Favorite">💜</span>
+                        )}
+                        <span className="text-foreground">{item.name}</span>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => removeFromOwner1(item.name)}
-                      className="text-red-500 hover:text-red-700 font-medium text-sm"
-                    >
-                      Remove
-                    </button>
+                    {!owner1LockedIn && (
+                      <button
+                        onClick={() => handleDeleteName(item.id)}
+                        className="text-red-500 hover:text-red-700 font-medium text-sm"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+              
+              {/* Shared names not owned by Owner 1 - shown at bottom with rank from Shared list */}
+              {sharedNames
+                .filter(shared => shared.addedBy === 'owner2')
+                .map((item) => (
+                  <div
+                    key={`owner1-shared-${item.name}`}
+                    className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800/50 border border-dashed border-gray-300 dark:border-gray-700"
+                  >
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
+                          #{item.rank}
+                        </span>
+                        <span className="text-foreground/70">{item.name}</span>
+                      </div>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 italic ml-8">
+                        Shared name - on Wife's list
+                      </span>
+                    </div>
                   </div>
                 ))}
             </div>
@@ -282,12 +489,14 @@ export default function BracketPage() {
                           </span>
                           <span className="text-foreground font-medium">{item.name}</span>
                         </div>
-                        <button
-                          onClick={() => removeFromShared(item.name)}
-                          className="text-red-500 hover:text-red-700 font-medium text-sm"
-                        >
-                          Remove
-                        </button>
+                        {!owner1LockedIn && !owner2LockedIn && (
+                          <button
+                            onClick={() => handleDeleteName(item.id)}
+                            className="text-red-500 hover:text-red-700 font-medium text-sm"
+                          >
+                            Remove
+                          </button>
+                        )}
                       </div>
                       <p className="text-xs text-gray-600 dark:text-gray-400 ml-12">
                         First added by: <span className="font-medium">{item.addedBy === 'owner1' ? 'Husband' : 'Wife'}</span>
@@ -307,32 +516,55 @@ export default function BracketPage() {
               {owner2Names.length} / {MAX_NAMES} names
             </p>
 
-            {/* Input Form */}
-            <form onSubmit={handleAddOwner2} className="mb-6">
-              <input
-                type="text"
-                value={owner2Input}
-                onChange={(e) => setOwner2Input(e.target.value)}
-                placeholder="Enter a baby name..."
-                className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-800 text-foreground focus:outline-none focus:ring-2 ${
-                  owner2Error 
-                    ? 'border-red-500 focus:ring-red-500' 
-                    : 'border-gray-300 dark:border-gray-700 focus:ring-foreground'
-                }`}
-              />
-              {owner2Error && (
-                <p className="mt-2 text-sm text-red-600 dark:text-red-400">
-                  {owner2Error}
+            {/* Input Form or Locked State */}
+            {!owner2LockedIn ? (
+              <>
+                <form onSubmit={handleAddOwner2} className="mb-4">
+                  <input
+                    type="text"
+                    value={owner2Input}
+                    onChange={(e) => setOwner2Input(e.target.value)}
+                    placeholder="Enter a baby name..."
+                    className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-800 text-foreground focus:outline-none focus:ring-2 ${
+                      owner2Error
+                        ? 'border-red-500 focus:ring-red-500'
+                        : 'border-gray-300 dark:border-gray-700 focus:ring-foreground'
+                    }`}
+                  />
+                  {owner2Error && (
+                    <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                      {owner2Error}
+                    </p>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={!owner2Input.trim() || !!owner2Error}
+                    className="mt-3 w-full px-4 py-2 bg-foreground text-background rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Add Name
+                  </button>
+                </form>
+                
+                {/* Lock In Button */}
+                <button
+                  onClick={() => handleLockIn('Owner 2')}
+                  disabled={owner2Names.length === 0}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-bold hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md mb-6"
+                >
+                  🔒 Lock In My Names
+                </button>
+              </>
+            ) : (
+              <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-600 rounded-lg">
+                <div className="flex items-center justify-center gap-2 text-green-700 dark:text-green-400">
+                  <span className="text-2xl">✅</span>
+                  <span className="font-bold text-lg">Names Locked In!</span>
+                </div>
+                <p className="text-center text-sm text-green-600 dark:text-green-500 mt-2">
+                  {owner1LockedIn ? 'Both parents ready! Bracket is active.' : 'Waiting for Husband to lock in...'}
                 </p>
-              )}
-              <button
-                type="submit"
-                disabled={!owner2Input.trim() || !!owner2Error}
-                className="mt-3 w-full px-4 py-2 bg-foreground text-background rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Add Name
-              </button>
-            </form>
+              </div>
+            )}
 
             {/* Names List (sorted by rank) */}
             <div className="space-y-2">
@@ -341,20 +573,57 @@ export default function BracketPage() {
                 .map((item) => (
                   <div
                     key={`owner2-${item.name}`}
-                    className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                    className={`flex items-center justify-between px-3 py-2 rounded-lg ${
+                      item.isShared
+                        ? 'bg-purple-50 dark:bg-purple-900/30 border-2 border-purple-300 dark:border-purple-700'
+                        : 'bg-gray-50 dark:bg-gray-800'
+                    }`}
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
+                      <span className={`text-xs font-bold px-2 py-1 rounded ${
+                        item.isShared
+                          ? 'text-purple-600 dark:text-purple-400 bg-purple-200 dark:bg-purple-900/60'
+                          : 'text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700'
+                      }`}>
                         #{item.rank}
                       </span>
-                      <span className="text-foreground">{item.name}</span>
+                      <div className="flex items-center gap-2">
+                        {item.isShared && (
+                          <span className="text-purple-500" title="Shared Favorite">💜</span>
+                        )}
+                        <span className="text-foreground">{item.name}</span>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => removeFromOwner2(item.name)}
-                      className="text-red-500 hover:text-red-700 font-medium text-sm"
-                    >
-                      Remove
-                    </button>
+                    {!owner2LockedIn && (
+                      <button
+                        onClick={() => handleDeleteName(item.id)}
+                        className="text-red-500 hover:text-red-700 font-medium text-sm"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+              
+              {/* Shared names not owned by Owner 2 - shown at bottom with rank from Shared list */}
+              {sharedNames
+                .filter(shared => shared.addedBy === 'owner1')
+                .map((item) => (
+                  <div
+                    key={`owner2-shared-${item.name}`}
+                    className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800/50 border border-dashed border-gray-300 dark:border-gray-700"
+                  >
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
+                          #{item.rank}
+                        </span>
+                        <span className="text-foreground/70">{item.name}</span>
+                      </div>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 italic ml-8">
+                        Shared name - on Husband's list
+                      </span>
+                    </div>
                   </div>
                 ))}
             </div>
