@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 
 export default function BracketPage() {
   // API Connection Status
@@ -331,6 +332,21 @@ export default function BracketPage() {
               <p className="text-center text-xl font-bold">
                 🎉 Both parents have locked in! The tournament is now active! 🎉
               </p>
+            </div>
+          )}
+
+          {/* Go to Tournament Button — shown persistently once both owners are locked in */}
+          {owner1LockedIn && owner2LockedIn && (
+            <div className="mt-6">
+              <Link
+                href="/tournament"
+                className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-lg font-bold rounded-xl shadow-lg hover:from-indigo-700 hover:to-purple-700 hover:shadow-xl transition-all transform hover:scale-105"
+              >
+                🏆 Go to Tournament Bracket
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
+              </Link>
             </div>
           )}
         </div>
