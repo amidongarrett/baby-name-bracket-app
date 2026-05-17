@@ -21,33 +21,56 @@ export default function BracketView({ matchups, status, voterId, votedMatchupIds
   const owner2R2Ref = useRef(null);
   const owner2R1Ref = useRef(null);
 
-  // Drag-to-scroll functionality
+  // Drag-to-scroll functionality (horizontal only — does not block vertical page scroll)
   const scrollContainerRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [scrollLeft, setScrollLeft] = useState(0);
+  const dragLocked   = useRef(false); // true once we've committed to horizontal scroll
+  const startXRef    = useRef(0);
+  const startYRef    = useRef(0);
+  const scrollLeftRef = useRef(0);
 
   const handleMouseDown = (e) => {
     if (!scrollContainerRef.current) return;
+    // Record start position but don't commit to drag yet
+    dragLocked.current = false;
     setIsDragging(true);
-    setStartX(e.pageX - scrollContainerRef.current.offsetLeft);
-    setScrollLeft(scrollContainerRef.current.scrollLeft);
+    startXRef.current    = e.pageX - scrollContainerRef.current.offsetLeft;
+    startYRef.current    = e.pageY;
+    scrollLeftRef.current = scrollContainerRef.current.scrollLeft;
   };
 
   const handleMouseMove = (e) => {
     if (!isDragging || !scrollContainerRef.current) return;
-    e.preventDefault();
-    const x = e.pageX - scrollContainerRef.current.offsetLeft;
-    const walk = (x - startX) * 2; // Multiply by 2 for faster scrolling
-    scrollContainerRef.current.scrollLeft = scrollLeft - walk;
+
+    const dx = Math.abs(e.pageX - (startXRef.current + scrollContainerRef.current.offsetLeft));
+    const dy = Math.abs(e.pageY - startYRef.current);
+
+    if (!dragLocked.current) {
+      // Not enough movement yet — wait for clear intent
+      if (dx < 4 && dy < 4) return;
+      // If vertical movement dominates, release the drag so the page can scroll
+      if (dy > dx) {
+        setIsDragging(false);
+        return;
+      }
+      // Horizontal movement dominates — lock into horizontal drag scroll
+      dragLocked.current = true;
+    }
+
+    e.preventDefault(); // Only called once drag direction is confirmed as horizontal
+    const x    = e.pageX - scrollContainerRef.current.offsetLeft;
+    const walk = (x - startXRef.current) * 2;
+    scrollContainerRef.current.scrollLeft = scrollLeftRef.current - walk;
   };
 
   const handleMouseUp = () => {
     setIsDragging(false);
+    dragLocked.current = false;
   };
 
   const handleMouseLeave = () => {
     setIsDragging(false);
+    dragLocked.current = false;
   };
 
   const scrollToRound = (ref) => {
