@@ -7,7 +7,7 @@
 
 import { useRef, useState } from 'react';
 
-export default function BracketView({ matchups, status, voterId, onVoteSuccess }) {
+export default function BracketView({ matchups, status, voterId, votedMatchupIds = [], onVoteSuccess }) {
   // Split into owner1 (top 8) and owner2 (bottom 8) matchups
   const owner1Matchups = matchups.slice(0, 8);
   const owner2Matchups = matchups.slice(8, 16);
@@ -120,6 +120,7 @@ export default function BracketView({ matchups, status, voterId, onVoteSuccess }
                     side="left"
                     onClick={() => scrollToRound(owner1R1Ref)}
                     voterId={voterId}
+                    votedMatchupIds={votedMatchupIds}
                     onVoteSuccess={onVoteSuccess}
                   />
                 ))}
@@ -313,6 +314,7 @@ export default function BracketView({ matchups, status, voterId, onVoteSuccess }
                     side="right"
                     onClick={() => scrollToRound(owner2R1Ref)}
                     voterId={voterId}
+                    votedMatchupIds={votedMatchupIds}
                     onVoteSuccess={onVoteSuccess}
                   />
                 ))}
@@ -333,6 +335,7 @@ export default function BracketView({ matchups, status, voterId, onVoteSuccess }
               status={status}
               index={index}
               voterId={voterId}
+              votedMatchupIds={votedMatchupIds}
               onVoteSuccess={onVoteSuccess}
             />
           ))}
@@ -348,7 +351,7 @@ export default function BracketView({ matchups, status, voterId, onVoteSuccess }
   );
 }
 
-function MatchupCard({ matchup, status, index, side = 'left', onClick, voterId, onVoteSuccess }) {
+function MatchupCard({ matchup, status, index, side = 'left', onClick, voterId, votedMatchupIds = [], onVoteSuccess }) {
   const [isVoting, setIsVoting] = useState(false);
 
   // Handle both draft and active status data structures
@@ -384,6 +387,7 @@ function MatchupCard({ matchup, status, index, side = 'left', onClick, voterId, 
   const name1Id = status === 'active' ? matchup.name1Id : null;
   const name2Id = status === 'active' ? matchup.name2Id : null;
   const matchupId = matchup._id || matchup.id;
+  const hasVoted = votedMatchupIds.includes(matchupId);
 
   // Handle vote submission
   const handleVote = async (selectedNameId, e) => {
@@ -444,13 +448,15 @@ function MatchupCard({ matchup, status, index, side = 'left', onClick, voterId, 
             </span>
           </div>
           {status === 'active' && !placeholder1 && (
-            <button
-              onClick={(e) => handleVote(name1Id, e)}
-              disabled={isVoting}
-              className="ml-2 px-2 py-0.5 text-[10px] font-semibold bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Vote
-            </button>
+            hasVoted
+              ? <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold text-green-700 bg-green-100 rounded">✓ Voted</span>
+              : <button
+                  onClick={(e) => handleVote(name1Id, e)}
+                  disabled={isVoting}
+                  className="ml-2 px-2 py-0.5 text-[10px] font-semibold bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Vote
+                </button>
           )}
           {status === 'draft' && (
             <span className="text-[10px] text-gray-500 ml-2">-</span>
@@ -489,13 +495,15 @@ function MatchupCard({ matchup, status, index, side = 'left', onClick, voterId, 
             </span>
           </div>
           {status === 'active' && !placeholder2 && (
-            <button
-              onClick={(e) => handleVote(name2Id, e)}
-              disabled={isVoting}
-              className="ml-2 px-2 py-0.5 text-[10px] font-semibold bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Vote
-            </button>
+            hasVoted
+              ? <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold text-green-700 bg-green-100 rounded">✓ Voted</span>
+              : <button
+                  onClick={(e) => handleVote(name2Id, e)}
+                  disabled={isVoting}
+                  className="ml-2 px-2 py-0.5 text-[10px] font-semibold bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Vote
+                </button>
           )}
           {status === 'draft' && (
             <span className="text-[10px] text-gray-500 ml-2">-</span>
@@ -626,7 +634,7 @@ function PlaceholderMatchup({ round, matchup1, matchup2, matchup3, matchup4, sta
   );
 }
 
-function MobileMatchupCard({ matchup, status, index, voterId, onVoteSuccess }) {
+function MobileMatchupCard({ matchup, status, index, voterId, votedMatchupIds = [], onVoteSuccess }) {
   const [isVoting, setIsVoting] = useState(false);
 
   const name1 = status === 'draft'
@@ -655,6 +663,7 @@ function MobileMatchupCard({ matchup, status, index, voterId, onVoteSuccess }) {
   const name1Id = status === 'active' ? matchup.name1Id : null;
   const name2Id = status === 'active' ? matchup.name2Id : null;
   const matchupId = matchup._id || matchup.id;
+  const hasVoted = votedMatchupIds.includes(matchupId);
 
   // Handle vote submission
   const handleVote = async (selectedNameId) => {
@@ -705,13 +714,15 @@ function MobileMatchupCard({ matchup, status, index, voterId, onVoteSuccess }) {
             </span>
           </div>
           {status === 'active' && !placeholder1 && (
-            <button
-              onClick={() => handleVote(name1Id)}
-              disabled={isVoting}
-              className="ml-2 px-3 py-1 text-xs font-semibold bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Vote
-            </button>
+            hasVoted
+              ? <span className="ml-2 px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded">✓ Voted</span>
+              : <button
+                  onClick={() => handleVote(name1Id)}
+                  disabled={isVoting}
+                  className="ml-2 px-3 py-1 text-xs font-semibold bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Vote
+                </button>
           )}
         </div>
         {/* Progress Bar for Team 1 */}
@@ -744,13 +755,15 @@ function MobileMatchupCard({ matchup, status, index, voterId, onVoteSuccess }) {
             </span>
           </div>
           {status === 'active' && !placeholder2 && (
-            <button
-              onClick={() => handleVote(name2Id)}
-              disabled={isVoting}
-              className="ml-2 px-3 py-1 text-xs font-semibold bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Vote
-            </button>
+            hasVoted
+              ? <span className="ml-2 px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded">✓ Voted</span>
+              : <button
+                  onClick={() => handleVote(name2Id)}
+                  disabled={isVoting}
+                  className="ml-2 px-3 py-1 text-xs font-semibold bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Vote
+                </button>
           )}
         </div>
         {/* Progress Bar for Team 2 */}

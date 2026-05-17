@@ -13,6 +13,7 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [voterId, setVoterId] = useState(null);
   const [previewMatchups, setPreviewMatchups] = useState([]);
+  const [votedMatchupIds, setVotedMatchupIds] = useState([]);
 
   // Persist voterId in localStorage
   useEffect(() => {
@@ -25,6 +26,22 @@ export default function Home() {
       setVoterId(newId);
     }
   }, []);
+
+  // Fetch which matchups this voter has already voted in
+  const fetchVotedMatchups = async (id) => {
+    if (!id) return;
+    try {
+      const res = await fetch(`http://localhost:3001/api/votes/user/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setVotedMatchupIds(data.votedMatchupIds || []);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (voterId) fetchVotedMatchups(voterId);
+  }, [voterId]);
 
   const fetchBracket = async () => {
     try {
@@ -226,7 +243,11 @@ export default function Home() {
           matchups={matchupGrid}
           status={bracket.status}
           voterId={voterId}
-          onVoteSuccess={fetchBracket}
+          votedMatchupIds={votedMatchupIds}
+          onVoteSuccess={async () => {
+            await fetchBracket();
+            await fetchVotedMatchups(voterId);
+          }}
         />
       </div>
     </div>
