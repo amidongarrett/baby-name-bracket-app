@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Portfolio | Your Name",
-  description: "Full-stack developer specializing in modern web applications with React, TypeScript, and Node.js",
+  title: "Baby Name Bracket Championship",
+  description: "A 32-name tournament bracket to find the perfect baby name — vote, pick winners, and crown a champion.",
 };
 
 export default function RootLayout({ children }) {

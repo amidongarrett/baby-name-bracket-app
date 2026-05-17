@@ -339,7 +339,7 @@ export default function BracketPage() {
           {owner1LockedIn && owner2LockedIn && (
             <div className="mt-6">
               <Link
-                href="/tournament"
+                href="/"
                 className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-lg font-bold rounded-xl shadow-lg hover:from-indigo-700 hover:to-purple-700 hover:shadow-xl transition-all transform hover:scale-105"
               >
                 🏆 Go to Tournament Bracket

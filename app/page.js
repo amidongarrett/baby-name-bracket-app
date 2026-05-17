@@ -1,27 +1,233 @@
-import Link from "next/link";
+'use client';
+
+import { useState, useEffect } from 'react';
+import BracketView from '@/components/bracket/BracketView';
+import { advanceTournamentRound } from '@/utils/api';
+
+const generateVoterId = () =>
+  'voter_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
 
 export default function Home() {
+  const [bracket, setBracket] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [voterId, setVoterId] = useState(null);
+  const [previewMatchups, setPreviewMatchups] = useState([]);
+
+  // Persist voterId in localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem('voterId');
+    if (stored) {
+      setVoterId(stored);
+    } else {
+      const newId = generateVoterId();
+      localStorage.setItem('voterId', newId);
+      setVoterId(newId);
+    }
+  }, []);
+
+  const fetchBracket = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:3001/api/bracket/current');
+      if (!response.ok) throw new Error('Failed to fetch bracket');
+      const data = await response.json();
+      setBracket(data);
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Client-side preview fallback (March Madness seeding)
+  const generateClientPreviewMatchups = (bracketData) => {
+    if (!bracketData || bracketData.totalNames !== 32) return [];
+    const allNames = [];
+    (bracketData.owner1Names || []).forEach((n, i) => {
+      if (!n.isShared) allNames.push({ id: n.id, value: n.value, submittedBy: n.submittedBy, rank: i + 1 });
+    });
+    (bracketData.owner2Names || []).forEach((n, i) => {
+      if (!n.isShared) allNames.push({ id: n.id, value: n.value, submittedBy: n.submittedBy, rank: i + 1 });
+    });
+    (bracketData.sharedNames || []).forEach((n, i) => {
+      allNames.push({ id: n.id, value: n.value, submittedBy: n.submittedBy, rank: i + 1, isShared: true });
+    });
+    const seeded = allNames.map((n, i) => ({ ...n, seed: i + 1 }));
+    const pairings = [
+      [1,32],[16,17],[8,25],[9,24],
+      [5,28],[12,21],[4,29],[13,20],
+      [6,27],[11,22],[3,30],[14,19],
+      [7,26],[10,23],[2,31],[15,18],
+    ];
+    return pairings.flatMap(([s1, s2]) => {
+      const n1 = seeded.find(n => n.seed === s1);
+      const n2 = seeded.find(n => n.seed === s2);
+      return n1 && n2 ? [{
+        _id: `preview-${s1}-${s2}`,
+        name1: { value: n1.value, seed: n1.seed, submittedBy: n1.submittedBy, isPlaceholder: false },
+        name2: { value: n2.value, seed: n2.seed, submittedBy: n2.submittedBy, isPlaceholder: false },
+      }] : [];
+    });
+  };
+
+  const fetchPreviewMatchups = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/bracket/preview');
+      if (!response.ok) throw new Error('preview unavailable');
+      const data = await response.json();
+      if (data.canGenerate && data.preview) {
+        setPreviewMatchups(data.preview);
+      } else {
+        setPreviewMatchups(bracket ? generateClientPreviewMatchups(bracket) : []);
+      }
+    } catch {
+      setPreviewMatchups(bracket ? generateClientPreviewMatchups(bracket) : []);
+    }
+  };
+
+  const handleLockBracket = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:3001/api/bracket/lock', { method: 'POST' });
+      if (!response.ok) throw new Error('Failed to lock bracket');
+      await fetchBracket();
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  const handleAdvanceRound = async () => {
+    try {
+      setLoading(true);
+      await advanceTournamentRound('roundOf32');
+      await fetchBracket();
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchBracket(); }, []);
+
+  useEffect(() => {
+    if (bracket?.status === 'draft') fetchPreviewMatchups();
+  }, [bracket?.status, bracket?.totalNames]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-gray-200 border-t-indigo-600 rounded-full animate-spin"></div>
+          <p className="text-gray-500 text-sm">Loading bracket…</p>
+        </div>
+      </div>
+    );
+  }
+  if (error) return <div className="min-h-screen flex items-center justify-center text-red-600">Error: {error}</div>;
+  if (!bracket) return null;
+
+  // Build name lookup map for active mode
+  const allNamesList = [
+    ...(bracket.owner1Names || []),
+    ...(bracket.owner2Names || []),
+    ...(bracket.sharedNames || []),
+  ];
+  const nameMap = Object.fromEntries(allNamesList.map(n => [n.id, n]));
+
+  let matchupGrid = bracket.status === 'draft'
+    ? previewMatchups
+    : (bracket.matchups?.roundOf32 || []).map((m, i) => {
+        const n1 = nameMap[m.name1Id];
+        const n2 = nameMap[m.name2Id];
+        return {
+          ...m,
+          name1: n1?.value || m.name1 || 'TBD',
+          name2: n2?.value || m.name2 || 'TBD',
+          name1Submitter: n1?.submittedBy || '',
+          name2Submitter: n2?.submittedBy || '',
+          seed1: m.seed1 ?? i * 2 + 1,
+          seed2: m.seed2 ?? i * 2 + 2,
+        };
+      });
+
+  if (matchupGrid.length === 0) {
+    matchupGrid = Array.from({ length: 16 }, (_, i) => ({
+      _id: `placeholder-${i}`,
+      name1: { value: 'TBD', isPlaceholder: true, seed: i * 2 + 1 },
+      name2: { value: 'TBD', isPlaceholder: true, seed: i * 2 + 2 },
+    }));
+  }
+
   return (
-    <div className="min-h-[70vh] flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto text-center">
-        {/* Main Heading */}
-        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-6">
-          Baby Name Bracket Championship
-        </h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
+      {/* Header */}
+      <div className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-800">
+        <div className="max-w-7xl mx-auto px-4 py-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Tournament Bracket</h1>
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                  bracket.status === 'draft'
+                    ? 'bg-yellow-100 text-yellow-800 border border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700'
+                    : 'bg-green-100 text-green-800 border border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700'
+                }`}>
+                  {bracket.status === 'draft' ? '📝 Draft' : '🔒 Active — Voting Open'}
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {bracket.totalNames ?? 0} / 32 names · Round of 32
+              </p>
+            </div>
 
-        {/* Description */}
-        <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-          Find the perfect name for your baby through an exciting tournament-style bracket.
-          Compare your favorite names head-to-head until you discover the winner!
-        </p>
+            <div className="flex items-center gap-3">
+              {bracket.status === 'draft' && (
+                <button
+                  onClick={handleLockBracket}
+                  disabled={bracket.totalNames !== 32}
+                  className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg shadow hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  🔒 Lock & Start Voting
+                </button>
+              )}
+              {bracket.status === 'active' && (
+                <span className="px-4 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-sm">
+                  🔒 Bracket Locked
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
-        {/* CTA Button */}
-        <Link
-          href="/bracket"
-          className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-background bg-foreground rounded-lg transition-all hover:opacity-90 hover:scale-105 active:scale-95"
-        >
-          Start Your Bracket
-        </Link>
+      {/* Info banner */}
+      <div className="max-w-7xl mx-auto px-4 pt-5">
+        {bracket.status === 'draft' && (
+          <div className="mb-4 bg-blue-50 dark:bg-blue-950/30 border-l-4 border-blue-500 p-3 rounded text-sm text-blue-800 dark:text-blue-300">
+            <strong>Server-Side Preview:</strong> Shows how the bracket will look once locked (March Madness seeding: 1v32, 2v31…).
+            {previewMatchups.length === 0
+              ? ' Add all 32 names to see the preview.'
+              : ' ✅ Ready — click "Lock & Start Voting" above.'}
+          </div>
+        )}
+        {bracket.status === 'active' && (
+          <div className="mb-4 bg-green-50 dark:bg-green-950/30 border-l-4 border-green-500 p-3 rounded text-sm text-green-800 dark:text-green-300">
+            <strong>🔒 Bracket Locked.</strong> Guests can now vote on matchups. Use <strong>Admin → Pick Winner of Round</strong> to advance when ready.
+          </div>
+        )}
+      </div>
+
+      {/* Bracket */}
+      <div className="pb-10">
+        <BracketView
+          matchups={matchupGrid}
+          status={bracket.status}
+          voterId={voterId}
+          onVoteSuccess={fetchBracket}
+        />
       </div>
     </div>
   );
