@@ -501,15 +501,16 @@ function MatchupCard({ matchup, status, index, side = 'left', onClick, voterId, 
           {status === 'draft' && <span className="text-[10px] text-gray-400 ml-2">-</span>}
         </div>
 
-        {/* Vote bar for name 1 */}
-        {status === 'active' && totalVotes > 0 && (
-          <div className={`px-2 pb-1 ${winner2 ? 'opacity-40' : ''}`}>
+        {/* Vote bar for name 1 — always rendered for active brackets so all
+            cards in the column stay the same height regardless of vote count. */}
+        {status === 'active' && !placeholder1 && (
+          <div className={`px-2.5 pb-1.5 ${winner2 ? 'opacity-40' : ''}`}>
             <div className="flex items-center gap-1">
               <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                 <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${percentage1}%` }} />
               </div>
-              <span className="text-[9px] text-gray-600 dark:text-gray-400 font-medium w-8 text-right">
-                {votes1} ({percentage1}%)
+              <span className="text-[9px] text-gray-400 dark:text-gray-500 font-medium w-14 text-right tabular-nums">
+                {totalVotes > 0 ? `${votes1} (${percentage1}%)` : '0 votes'}
               </span>
             </div>
           </div>
@@ -540,15 +541,15 @@ function MatchupCard({ matchup, status, index, side = 'left', onClick, voterId, 
           {status === 'draft' && <span className="text-[10px] text-gray-400 ml-2">-</span>}
         </div>
 
-        {/* Vote bar for name 2 */}
-        {status === 'active' && totalVotes > 0 && (
-          <div className={`px-2 pb-1 ${winner1 ? 'opacity-40' : ''}`}>
+        {/* Vote bar for name 2 — always rendered for active brackets (same reason as above). */}
+        {status === 'active' && !placeholder2 && (
+          <div className={`px-2.5 pb-1.5 ${winner1 ? 'opacity-40' : ''}`}>
             <div className="flex items-center gap-1">
               <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                 <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${percentage2}%` }} />
               </div>
-              <span className="text-[9px] text-gray-600 dark:text-gray-400 font-medium w-8 text-right">
-                {votes2} ({percentage2}%)
+              <span className="text-[9px] text-gray-400 dark:text-gray-500 font-medium w-14 text-right tabular-nums">
+                {totalVotes > 0 ? `${votes2} (${percentage2}%)` : '0 votes'}
               </span>
             </div>
           </div>
