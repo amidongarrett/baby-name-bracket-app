@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useUser } from '@/contexts/UserContext';
 
 const ROUND_KEY_MAP = {
   'Round of 32':  'roundOf32',
@@ -12,24 +13,20 @@ const ROUND_KEY_MAP = {
 };
 
 export default function PickWinnerPage() {
-  const [bracket, setBracket] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [activeOwner, setActiveOwner] = useState(null); // 'owner1' | 'owner2'
-  // picks: { [matchupId]: { owner1: nameId | null, owner2: nameId | null } }
-  const [picks, setPicks] = useState({});
+  const { userType, isOwner, displayEmoji, displayName } = useUser();
+
+  const [bracket, setBracket]   = useState(null);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(null);
+  const [picks, setPicks]       = useState({});
   const [advancing, setAdvancing] = useState(false);
 
-  // Hydrate picks and auto-select owner from userType on mount
+  // Hydrate picks from localStorage on mount
   useEffect(() => {
     try {
       const stored = localStorage.getItem('parentPicks');
       if (stored) setPicks(JSON.parse(stored));
     } catch {}
-    const storedType = localStorage.getItem('userType');
-    if (storedType === 'owner1' || storedType === 'owner2') {
-      setActiveOwner(storedType);
-    }
   }, []);
 
   // Persist picks whenever they change
@@ -93,23 +90,22 @@ export default function PickWinnerPage() {
   // ── Handlers ─────────────────────────────────────────────────────────────
 
   const handleResetPicks = async () => {
-    // Clear local picks immediately
     localStorage.removeItem('parentPicks');
     setPicks({});
-    // Also undo the last round advancement on the backend so winnerId fields are cleared
     try {
       await fetch('http://localhost:3001/api/bracket/reset-round', { method: 'POST' });
       await fetchBracket();
     } catch {
-      // If the endpoint isn't available yet, silently ignore — local reset still works
+      // Silently ignore — local reset still applied
     }
   };
 
+  // userType ('owner1' | 'owner2') is used directly as the picks key
   const handlePick = (matchupId, nameId) => {
-    if (!activeOwner) return;
+    if (!isOwner) return;
     setPicks(prev => ({
       ...prev,
-      [matchupId]: { ...prev[matchupId], [activeOwner]: nameId },
+      [matchupId]: { ...prev[matchupId], [userType]: nameId },
     }));
   };
 
@@ -134,7 +130,7 @@ export default function PickWinnerPage() {
     }
   };
 
-  // ── States: loading / error / not active ─────────────────────────────────
+  // ── Loading / error / inactive states ────────────────────────────────────
 
   if (loading) {
     return (
@@ -163,17 +159,14 @@ export default function PickWinnerPage() {
         <p className="text-gray-500 dark:text-gray-400 max-w-sm">
           Both parents need to lock in their names before picking round winners.
         </p>
-        <Link
-          href="/bracket"
-          className="mt-2 px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
-        >
+        <Link href="/bracket" className="mt-2 px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors">
           Go to Names Dashboard
         </Link>
       </div>
     );
   }
 
-  // Tournament is complete — show champion screen instead of pick UI
+  // Tournament complete
   if (bracket?.championNameId) {
     const championName = [...(bracket.owner1Names || []), ...(bracket.owner2Names || []), ...(bracket.sharedNames || [])]
       .find(n => n.id === bracket.championNameId);
@@ -191,10 +184,7 @@ export default function PickWinnerPage() {
             The tournament is complete! 🎉 This name won the championship.
           </p>
         </div>
-        <Link
-          href="/"
-          className="mt-2 px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-lg shadow-lg transition-colors"
-        >
+        <Link href="/" className="mt-2 px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-lg shadow-lg transition-colors">
           View Final Bracket
         </Link>
       </div>
@@ -209,12 +199,27 @@ export default function PickWinnerPage() {
       {/* Page header */}
       <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
         <div className="max-w-3xl mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-            Pick Winner — {bracket?.currentRound || 'Round of 32'}
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Both parents pick a winner for every matchup. Once you agree, the round can advance.
-          </p>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                Pick Winner — {bracket?.currentRound || 'Round of 32'}
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {isOwner
+                  ? `Picking as ${displayEmoji} ${displayName} · Switch roles in the menu anytime.`
+                  : 'Both parents pick a winner for every matchup. Once you agree, the round can advance.'}
+              </p>
+            </div>
+
+            {/* Current identity chip */}
+            <span className={`self-start mt-0.5 px-3 py-1.5 rounded-full text-xs font-bold border ${
+              isOwner
+                ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700'
+            }`}>
+              {displayEmoji} {displayName}
+            </span>
+          </div>
 
           {/* Progress summary + reset */}
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -233,57 +238,36 @@ export default function PickWinnerPage() {
                 {matchups.length - agreedCount - disagreedCount} unpicked
               </span>
             </div>
-            {Object.keys(picks).length > 0 && (
+            {Object.keys(picks).length > 0 && isOwner && (
               <button
                 onClick={handleResetPicks}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
               >
-                🔄 Reset Round Picks
+                🔄 Reset Round
               </button>
             )}
           </div>
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-
-        {/* Owner selector */}
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-          <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-            Who are you?
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { id: 'owner1', label: '👨 Husband', activeColor: 'bg-blue-600 border-blue-600 text-white shadow-md', hoverColor: 'hover:border-blue-400' },
-              { id: 'owner2', label: '👩 Wife',    activeColor: 'bg-purple-600 border-purple-600 text-white shadow-md', hoverColor: 'hover:border-purple-400' },
-            ].map(({ id, label, activeColor, hoverColor }) => (
-              <button
-                key={id}
-                onClick={() => setActiveOwner(id)}
-                className={`py-3 px-4 rounded-lg font-semibold text-sm transition-all border-2 ${
-                  activeOwner === id
-                    ? activeColor
-                    : `bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 ${hoverColor}`
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+      {/* Guest notice */}
+      {!isOwner && (
+        <div className="max-w-3xl mx-auto px-4 pt-5">
+          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-700 rounded-xl p-4 text-sm text-amber-800 dark:text-amber-300">
+            <strong>👤 You're viewing as a Guest.</strong> Open the menu and switch to Husband or Wife to make picks.
           </div>
-          {!activeOwner && (
-            <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-              Select your role above to start picking winners.
-            </p>
-          )}
         </div>
+      )}
+
+      <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
 
         {/* Matchup cards */}
         {matchups.map((matchup, index) => {
-          const status    = getStatus(matchup);
-          const pick      = picks[matchup._id] || {};
+          const status     = getStatus(matchup);
+          const pick       = picks[matchup._id] || {};
           const totalVotes = matchup.votes1 + matchup.votes2;
-          const pct1      = totalVotes > 0 ? Math.round((matchup.votes1 / totalVotes) * 100) : 50;
-          const pct2      = 100 - pct1;
+          const pct1       = totalVotes > 0 ? Math.round((matchup.votes1 / totalVotes) * 100) : 50;
+          const pct2       = 100 - pct1;
 
           const cardBorder = {
             agreed:   'border-green-400  dark:border-green-600  bg-green-50  dark:bg-green-950/30',
@@ -301,11 +285,11 @@ export default function PickWinnerPage() {
             return (
               <button
                 onClick={() => handlePick(matchup._id, nameId)}
-                disabled={!activeOwner}
+                disabled={!isOwner}
                 className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-all ${
                   isHighlighted
                     ? `${border} ${bg}`
-                    : `border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${activeOwner ? hoverBorder : ''}`
+                    : `border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${isOwner ? hoverBorder : ''}`
                 } disabled:cursor-default`}
               >
                 {/* Name + vote count */}
@@ -364,7 +348,6 @@ export default function PickWinnerPage() {
                 </div>
               </div>
 
-              {/* Option 1 */}
               {renderNameOption(matchup.name1Id, matchup.name1Value, matchup.votes1, pct1, {
                 border: 'border-blue-500',
                 bg: 'bg-blue-50 dark:bg-blue-950/40',
@@ -374,7 +357,6 @@ export default function PickWinnerPage() {
 
               <div className="text-center text-xs font-bold text-gray-300 dark:text-gray-600 my-2">VS</div>
 
-              {/* Option 2 */}
               {renderNameOption(matchup.name2Id, matchup.name2Value, matchup.votes2, pct2, {
                 border: 'border-purple-500',
                 bg: 'bg-purple-50 dark:bg-purple-950/40',
@@ -385,36 +367,38 @@ export default function PickWinnerPage() {
           );
         })}
 
-        {/* Advance CTA */}
-        <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
-          {allAgreed ? (
-            <button
-              onClick={handleAdvance}
-              disabled={advancing}
-              className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold text-lg rounded-xl shadow-lg hover:from-green-700 hover:to-emerald-700 transition-all transform hover:scale-[1.01] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
-            >
-              {advancing ? 'Advancing Round…' : '🚀 Confirm & Advance to Next Round'}
-            </button>
-          ) : (
-            <div className="text-center space-y-2">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {disagreedCount > 0
-                  ? `⚠️ ${disagreedCount} matchup${disagreedCount !== 1 ? 's' : ''} in disagreement — both parents must pick the same winner.`
-                  : `Both parents must pick a winner for all ${matchups.length} matchups to advance.`
-                }
-              </p>
-              <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden max-w-xs mx-auto">
-                <div
-                  className="h-full bg-green-500 rounded-full transition-all duration-500"
-                  style={{ width: `${matchups.length > 0 ? (agreedCount / matchups.length) * 100 : 0}%` }}
-                />
+        {/* Advance CTA — owners only */}
+        {isOwner && (
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
+            {allAgreed ? (
+              <button
+                onClick={handleAdvance}
+                disabled={advancing}
+                className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold text-lg rounded-xl shadow-lg hover:from-green-700 hover:to-emerald-700 transition-all transform hover:scale-[1.01] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
+              >
+                {advancing ? 'Advancing Round…' : '🚀 Confirm & Advance to Next Round'}
+              </button>
+            ) : (
+              <div className="text-center space-y-2">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {disagreedCount > 0
+                    ? `⚠️ ${disagreedCount} matchup${disagreedCount !== 1 ? 's' : ''} in disagreement — both parents must pick the same winner.`
+                    : `Both parents must pick a winner for all ${matchups.length} matchups to advance.`
+                  }
+                </p>
+                <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden max-w-xs mx-auto">
+                  <div
+                    className="h-full bg-green-500 rounded-full transition-all duration-500"
+                    style={{ width: `${matchups.length > 0 ? (agreedCount / matchups.length) * 100 : 0}%` }}
+                  />
+                </div>
+                <p className="text-xs text-gray-400">
+                  {agreedCount} of {matchups.length} matchups agreed
+                </p>
               </div>
-              <p className="text-xs text-gray-400">
-                {agreedCount} of {matchups.length} matchups agreed
-              </p>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
       </div>
     </div>
