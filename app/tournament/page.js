@@ -213,10 +213,32 @@ export default function TournamentPage() {
   if (error) return <div>Error: {error}</div>;
   if (!bracket) return <div>No bracket data</div>;
 
-  // Use server-provided preview matchups for draft mode, actual matchups for active mode
+  // Build a name lookup map from all available names so we can resolve IDs → display values
+  const allNamesList = [
+    ...(bracket.owner1Names || []),
+    ...(bracket.owner2Names || []),
+    ...(bracket.sharedNames || []),
+  ];
+  const nameMap = Object.fromEntries(allNamesList.map(n => [n.id, n]));
+
+  // Use server-provided preview matchups for draft mode, actual matchups for active mode.
+  // For active mode, enrich each matchup by resolving name1Id/name2Id → display strings
+  // because the backend stores UUIDs, not resolved name values.
   let matchupGrid = bracket.status === 'draft'
     ? previewMatchups
-    : (bracket.matchups?.roundOf32 || []);
+    : (bracket.matchups?.roundOf32 || []).map((m, i) => {
+        const n1 = nameMap[m.name1Id];
+        const n2 = nameMap[m.name2Id];
+        return {
+          ...m,
+          name1: n1?.value || m.name1 || 'TBD',
+          name2: n2?.value || m.name2 || 'TBD',
+          name1Submitter: n1?.submittedBy || '',
+          name2Submitter: n2?.submittedBy || '',
+          seed1: m.seed1 ?? i * 2 + 1,
+          seed2: m.seed2 ?? i * 2 + 2,
+        };
+      });
   
   // Fallback: If no matchups exist, create 16 placeholder matchups for better UX
   if (matchupGrid.length === 0) {
