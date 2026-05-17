@@ -35,7 +35,7 @@ export default function BracketView({ matchups, status, voterId, votedMatchupIds
     dragDir.current = null;
     setIsDragging(true);
     startXRef.current     = e.pageX - scrollContainerRef.current.offsetLeft;
-    startYRef.current     = e.pageY;
+    startYRef.current     = e.clientY;  // clientY: viewport-relative, unaffected by page scroll
     scrollLeftRef.current = scrollContainerRef.current.scrollLeft;
   };
 
@@ -43,7 +43,7 @@ export default function BracketView({ matchups, status, voterId, votedMatchupIds
     if (!isDragging || !scrollContainerRef.current) return;
 
     const dx = Math.abs(e.pageX - (startXRef.current + scrollContainerRef.current.offsetLeft));
-    const dy = Math.abs(e.pageY - startYRef.current);
+    const dy = Math.abs(e.clientY - startYRef.current);
 
     // Wait for at least 4 px of movement before committing to a direction
     if (!dragDir.current) {
@@ -52,9 +52,12 @@ export default function BracketView({ matchups, status, voterId, votedMatchupIds
     }
 
     if (dragDir.current === 'v') {
-      // Vertical: scroll the page by the incremental delta each frame
-      const delta = startYRef.current - e.pageY;
-      startYRef.current = e.pageY; // reset so next frame is incremental
+      // Vertical: scroll the page by the incremental clientY delta each frame.
+      // Must use clientY (viewport-relative) — pageY includes window.scrollY,
+      // so using pageY here creates a feedback loop where each scroll call
+      // changes the next pageY reading and the screen oscillates.
+      const delta = startYRef.current - e.clientY;
+      startYRef.current = e.clientY;
       window.scrollBy(0, delta);
       return;
     }
