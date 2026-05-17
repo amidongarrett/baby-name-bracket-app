@@ -20,12 +20,16 @@ export default function PickWinnerPage() {
   const [picks, setPicks] = useState({});
   const [advancing, setAdvancing] = useState(false);
 
-  // Hydrate picks from localStorage on mount
+  // Hydrate picks and auto-select owner from userType on mount
   useEffect(() => {
     try {
       const stored = localStorage.getItem('parentPicks');
       if (stored) setPicks(JSON.parse(stored));
     } catch {}
+    const storedType = localStorage.getItem('userType');
+    if (storedType === 'owner1' || storedType === 'owner2') {
+      setActiveOwner(storedType);
+    }
   }, []);
 
   // Persist picks whenever they change
@@ -88,9 +92,17 @@ export default function PickWinnerPage() {
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
-  const handleResetPicks = () => {
+  const handleResetPicks = async () => {
+    // Clear local picks immediately
     localStorage.removeItem('parentPicks');
     setPicks({});
+    // Also undo the last round advancement on the backend so winnerId fields are cleared
+    try {
+      await fetch('http://localhost:3001/api/bracket/reset-round', { method: 'POST' });
+      await fetchBracket();
+    } catch {
+      // If the endpoint isn't available yet, silently ignore — local reset still works
+    }
   };
 
   const handlePick = (matchupId, nameId) => {
