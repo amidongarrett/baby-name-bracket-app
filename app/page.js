@@ -61,16 +61,34 @@ export default function Home() {
   // Client-side preview fallback (March Madness seeding)
   const generateClientPreviewMatchups = (bracketData) => {
     if (!bracketData || bracketData.totalNames !== 32) return [];
+
+    // Interleave H and W by rank: [H#1, W#1, H#2, W#2, ...] so that seed 1
+    // (H#1) and seed 2 (W#1) end up on opposite bracket halves and can only
+    // meet in the Finals.
+    const owner1 = bracketData.owner1Names || [];
+    const owner2 = bracketData.owner2Names || [];
+    const seenIds = new Set();
     const allNames = [];
-    (bracketData.owner1Names || []).forEach((n, i) => {
-      if (!n.isShared) allNames.push({ id: n.id, value: n.value, submittedBy: n.submittedBy, rank: i + 1 });
-    });
-    (bracketData.owner2Names || []).forEach((n, i) => {
-      if (!n.isShared) allNames.push({ id: n.id, value: n.value, submittedBy: n.submittedBy, rank: i + 1 });
-    });
+
+    const maxLen = Math.max(owner1.length, owner2.length);
+    for (let i = 0; i < maxLen; i++) {
+      if (i < owner1.length && !seenIds.has(owner1[i].id)) {
+        seenIds.add(owner1[i].id);
+        allNames.push({ id: owner1[i].id, value: owner1[i].value, submittedBy: owner1[i].submittedBy, rank: i + 1 });
+      }
+      if (i < owner2.length && !seenIds.has(owner2[i].id)) {
+        seenIds.add(owner2[i].id);
+        allNames.push({ id: owner2[i].id, value: owner2[i].value, submittedBy: owner2[i].submittedBy, rank: i + 1 });
+      }
+    }
+    // Add any shared names not yet captured
     (bracketData.sharedNames || []).forEach((n, i) => {
-      allNames.push({ id: n.id, value: n.value, submittedBy: n.submittedBy, rank: i + 1, isShared: true });
+      if (!seenIds.has(n.id)) {
+        seenIds.add(n.id);
+        allNames.push({ id: n.id, value: n.value, submittedBy: n.submittedBy, rank: i + 1, isShared: true });
+      }
     });
+
     const seeded = allNames.map((n, i) => ({ ...n, seed: i + 1 }));
     const pairings = [
       [1,32],[16,17],[8,25],[9,24],
