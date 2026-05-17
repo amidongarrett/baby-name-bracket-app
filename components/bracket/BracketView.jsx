@@ -410,27 +410,27 @@ function MatchupCard({ matchup, status, index, side = 'left', onClick, voterId, 
   const leading1  = !winnerId && votes1 > 0 && votes1 > votes2;
   const leading2  = !winnerId && votes2 > 0 && votes2 > votes1;
 
-  // Row background classes
-  const row1Bg = winner1  ? 'bg-green-50 dark:bg-green-950/40'
-               : winner2  ? 'bg-gray-100 dark:bg-gray-800/60'
-               : leading1 ? 'bg-green-50/60 dark:bg-green-950/20'
+  // Row background classes — semi-transparent overlays for winner/loser
+  const row1Bg = winner1  ? 'bg-green-500/20 dark:bg-green-500/25'
+               : winner2  ? 'bg-gray-400/20 dark:bg-gray-500/25'
+               : leading1 ? 'bg-green-400/10 dark:bg-green-500/15'
                : !placeholder1 ? 'hover:bg-blue-50 dark:hover:bg-blue-950/20'
                : 'bg-gray-50 dark:bg-gray-800/30';
-  const row2Bg = winner2  ? 'bg-green-50 dark:bg-green-950/40'
-               : winner1  ? 'bg-gray-100 dark:bg-gray-800/60'
-               : leading2 ? 'bg-green-50/60 dark:bg-green-950/20'
+  const row2Bg = winner2  ? 'bg-green-500/20 dark:bg-green-500/25'
+               : winner1  ? 'bg-gray-400/20 dark:bg-gray-500/25'
+               : leading2 ? 'bg-green-400/10 dark:bg-green-500/15'
                : !placeholder2 ? 'hover:bg-purple-50 dark:hover:bg-purple-950/20'
                : 'bg-gray-50 dark:bg-gray-800/30';
 
   // Name text classes
-  const nameText1 = winner2 ? 'text-gray-400 dark:text-gray-600'
-                  : winner1 ? 'text-green-800 dark:text-green-300 font-semibold'
+  const nameText1 = winner2 ? 'text-gray-400 dark:text-gray-500'
+                  : winner1 ? 'text-green-800 dark:text-green-300 font-bold'
                   : placeholder1 ? 'text-gray-400 italic'
-                  : 'text-gray-900 dark:text-gray-100';
-  const nameText2 = winner1 ? 'text-gray-400 dark:text-gray-600'
-                  : winner2 ? 'text-green-800 dark:text-green-300 font-semibold'
+                  : 'text-gray-900 dark:text-gray-100 font-bold';
+  const nameText2 = winner1 ? 'text-gray-400 dark:text-gray-500'
+                  : winner2 ? 'text-green-800 dark:text-green-300 font-bold'
                   : placeholder2 ? 'text-gray-400 italic'
-                  : 'text-gray-900 dark:text-gray-100';
+                  : 'text-gray-900 dark:text-gray-100 font-bold';
 
   // Handle vote submission
   const handleVote = async (selectedNameId, e) => {
@@ -473,17 +473,17 @@ function MatchupCard({ matchup, status, index, side = 'left', onClick, voterId, 
       <div className={`absolute ${connectorPos} top-1/2 w-8 h-0.5 bg-gray-300 hidden xl:block`}></div>
       
       <div
-        className="bg-white rounded border border-gray-300 shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+        className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-600 shadow overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
         onClick={onClick}
       >
         {/* Name 1 row */}
-        <div className={`flex items-center justify-between px-2 py-1 border-b border-gray-200 dark:border-gray-700 transition-colors ${row1Bg}`}>
+        <div className={`flex items-center justify-between px-2.5 py-2 border-b border-gray-200 dark:border-gray-700 transition-colors ${row1Bg}`}>
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <span className={`text-[10px] font-bold w-5 text-center ${winner2 ? 'text-gray-400' : 'text-gray-600 dark:text-gray-400'}`}>
+            <span className={`text-xs font-bold w-5 text-center shrink-0 ${winner2 ? 'text-gray-400' : 'text-gray-500 dark:text-gray-400'}`}>
               {seed1}
             </span>
-            {winner1 && <span className="text-[10px]">🏆</span>}
-            <span className={`text-xs font-medium truncate ${nameText1}`}>
+            {winner1 && <span className="text-xs shrink-0">🏆</span>}
+            <span className={`text-sm truncate ${nameText1}`}>
               {name1}
             </span>
           </div>
@@ -516,13 +516,13 @@ function MatchupCard({ matchup, status, index, side = 'left', onClick, voterId, 
         )}
 
         {/* Name 2 row */}
-        <div className={`flex items-center justify-between px-2 py-1 transition-colors ${row2Bg}`}>
+        <div className={`flex items-center justify-between px-2.5 py-2 transition-colors ${row2Bg}`}>
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <span className={`text-[10px] font-bold w-5 text-center ${winner1 ? 'text-gray-400' : 'text-gray-600 dark:text-gray-400'}`}>
+            <span className={`text-xs font-bold w-5 text-center shrink-0 ${winner1 ? 'text-gray-400' : 'text-gray-500 dark:text-gray-400'}`}>
               {seed2}
             </span>
-            {winner2 && <span className="text-[10px]">🏆</span>}
-            <span className={`text-xs font-medium truncate ${nameText2}`}>
+            {winner2 && <span className="text-xs shrink-0">🏆</span>}
+            <span className={`text-sm truncate ${nameText2}`}>
               {name2}
             </span>
           </div>

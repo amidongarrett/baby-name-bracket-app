@@ -88,6 +88,11 @@ export default function PickWinnerPage() {
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
+  const handleResetPicks = () => {
+    localStorage.removeItem('parentPicks');
+    setPicks({});
+  };
+
   const handlePick = (matchupId, nameId) => {
     if (!activeOwner) return;
     setPicks(prev => ({
@@ -199,21 +204,31 @@ export default function PickWinnerPage() {
             Both parents pick a winner for every matchup. Once you agree, the round can advance.
           </p>
 
-          {/* Progress summary */}
-          <div className="mt-4 flex flex-wrap items-center gap-4 text-sm">
-            <span className="flex items-center gap-1.5 font-medium text-green-700 dark:text-green-400">
-              <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-              {agreedCount} agreed
-            </span>
-            {disagreedCount > 0 && (
-              <span className="flex items-center gap-1.5 font-medium text-orange-600 dark:text-orange-400">
-                <span className="w-2 h-2 rounded-full bg-orange-500 inline-block" />
-                {disagreedCount} disagreed
+          {/* Progress summary + reset */}
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-4 text-sm">
+              <span className="flex items-center gap-1.5 font-medium text-green-700 dark:text-green-400">
+                <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                {agreedCount} agreed
               </span>
+              {disagreedCount > 0 && (
+                <span className="flex items-center gap-1.5 font-medium text-orange-600 dark:text-orange-400">
+                  <span className="w-2 h-2 rounded-full bg-orange-500 inline-block" />
+                  {disagreedCount} disagreed
+                </span>
+              )}
+              <span className="text-gray-400">
+                {matchups.length - agreedCount - disagreedCount} unpicked
+              </span>
+            </div>
+            {Object.keys(picks).length > 0 && (
+              <button
+                onClick={handleResetPicks}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+              >
+                🔄 Reset Round Picks
+              </button>
             )}
-            <span className="text-gray-400">
-              {matchups.length - agreedCount - disagreedCount} unpicked
-            </span>
           </div>
         </div>
       </div>
