@@ -354,40 +354,54 @@ export default function BracketView({ matchups, status, voterId, votedMatchupIds
 function MatchupCard({ matchup, status, index, side = 'left', onClick, voterId, votedMatchupIds = [], onVoteSuccess }) {
   const [isVoting, setIsVoting] = useState(false);
 
-  // Handle both draft and active status data structures
-  const name1 = status === 'draft'
-    ? (matchup.name1?.value || matchup.name1?.name || 'N/A')
-    : matchup.name1;
-  const name2 = status === 'draft'
-    ? (matchup.name2?.value || matchup.name2?.name || 'N/A')
-    : matchup.name2;
-  const submitter1 = status === 'draft'
-    ? (matchup.name1?.submittedBy || 'Unknown')
-    : (matchup.name1Submitter || 'Unknown');
-  const submitter2 = status === 'draft'
-    ? (matchup.name2?.submittedBy || 'Unknown')
-    : (matchup.name2Submitter || 'Unknown');
-  const seed1 = status === 'draft'
-    ? (matchup.name1?.seed || matchup.name1?.rank || index * 2 + 1)
-    : (matchup.seed1 || index * 2 + 1);
-  const seed2 = status === 'draft'
-    ? (matchup.name2?.seed || matchup.name2?.rank || index * 2 + 2)
-    : (matchup.seed2 || index * 2 + 2);
-  const placeholder1 = status === 'draft' && matchup.name1?.isPlaceholder;
-  const placeholder2 = status === 'draft' && matchup.name2?.isPlaceholder;
+  // All matchups arrive pre-normalised from app/page.js — read flat fields directly
+  const name1       = matchup.name1  || 'TBD';
+  const name2       = matchup.name2  || 'TBD';
+  const seed1       = matchup.seed1  || index * 2 + 1;
+  const seed2       = matchup.seed2  || index * 2 + 2;
+  const placeholder1 = matchup.isPlaceholder1 || false;
+  const placeholder2 = matchup.isPlaceholder2 || false;
+  const name1Id     = matchup.name1Id || null;
+  const name2Id     = matchup.name2Id || null;
+  const matchupId   = matchup._id || matchup.id;
+  const hasVoted    = votedMatchupIds.includes(matchupId);
 
-  // Get vote counts (only for active status)
-  const votes1 = status === 'active' ? (matchup.votes?.name1Votes || 0) : 0;
-  const votes2 = status === 'active' ? (matchup.votes?.name2Votes || 0) : 0;
-  const totalVotes = votes1 + votes2;
+  // Votes
+  const votes1      = matchup.votes1 ?? 0;
+  const votes2      = matchup.votes2 ?? 0;
+  const totalVotes  = votes1 + votes2;
   const percentage1 = totalVotes > 0 ? Math.round((votes1 / totalVotes) * 100) : 0;
   const percentage2 = totalVotes > 0 ? Math.round((votes2 / totalVotes) * 100) : 0;
 
-  // Get name IDs for voting (only for active status)
-  const name1Id = status === 'active' ? matchup.name1Id : null;
-  const name2Id = status === 'active' ? matchup.name2Id : null;
-  const matchupId = matchup._id || matchup.id;
-  const hasVoted = votedMatchupIds.includes(matchupId);
+  // Winner / loser detection
+  const winnerId  = matchup.winnerId || null;
+  const winner1   = winnerId && winnerId === name1Id;
+  const winner2   = winnerId && winnerId === name2Id;
+  // When no winner locked yet, highlight the leader based on current vote tally
+  const leading1  = !winnerId && votes1 > 0 && votes1 > votes2;
+  const leading2  = !winnerId && votes2 > 0 && votes2 > votes1;
+
+  // Row background classes
+  const row1Bg = winner1  ? 'bg-green-50 dark:bg-green-950/40'
+               : winner2  ? 'bg-gray-100 dark:bg-gray-800/60'
+               : leading1 ? 'bg-green-50/60 dark:bg-green-950/20'
+               : !placeholder1 ? 'hover:bg-blue-50 dark:hover:bg-blue-950/20'
+               : 'bg-gray-50 dark:bg-gray-800/30';
+  const row2Bg = winner2  ? 'bg-green-50 dark:bg-green-950/40'
+               : winner1  ? 'bg-gray-100 dark:bg-gray-800/60'
+               : leading2 ? 'bg-green-50/60 dark:bg-green-950/20'
+               : !placeholder2 ? 'hover:bg-purple-50 dark:hover:bg-purple-950/20'
+               : 'bg-gray-50 dark:bg-gray-800/30';
+
+  // Name text classes
+  const nameText1 = winner2 ? 'text-gray-400 dark:text-gray-600'
+                  : winner1 ? 'text-green-800 dark:text-green-300 font-semibold'
+                  : placeholder1 ? 'text-gray-400 italic'
+                  : 'text-gray-900 dark:text-gray-100';
+  const nameText2 = winner1 ? 'text-gray-400 dark:text-gray-600'
+                  : winner2 ? 'text-green-800 dark:text-green-300 font-semibold'
+                  : placeholder2 ? 'text-gray-400 italic'
+                  : 'text-gray-900 dark:text-gray-100';
 
   // Handle vote submission
   const handleVote = async (selectedNameId, e) => {
@@ -433,23 +447,20 @@ function MatchupCard({ matchup, status, index, side = 'left', onClick, voterId, 
         className="bg-white rounded border border-gray-300 shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
         onClick={onClick}
       >
-        {/* Team 1 */}
-        <div className={`flex items-center justify-between px-2 py-1 border-b border-gray-200 ${
-          placeholder1 ? 'bg-gray-50' : 'hover:bg-blue-50'
-        } transition-colors`}>
+        {/* Name 1 row */}
+        <div className={`flex items-center justify-between px-2 py-1 border-b border-gray-200 dark:border-gray-700 transition-colors ${row1Bg}`}>
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <span className="text-[10px] font-bold text-gray-600 w-5 text-center">
+            <span className={`text-[10px] font-bold w-5 text-center ${winner2 ? 'text-gray-400' : 'text-gray-600 dark:text-gray-400'}`}>
               {seed1}
             </span>
-            <span className={`text-xs font-medium truncate ${
-              placeholder1 ? 'text-gray-400 italic' : 'text-gray-900'
-            }`}>
+            {winner1 && <span className="text-[10px]">🏆</span>}
+            <span className={`text-xs font-medium truncate ${nameText1}`}>
               {name1}
             </span>
           </div>
-          {status === 'active' && !placeholder1 && (
+          {status === 'active' && !placeholder1 && !winnerId && (
             hasVoted
-              ? <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold text-green-700 bg-green-100 rounded">✓ Voted</span>
+              ? <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold text-green-700 bg-green-100 dark:bg-green-900/40 dark:text-green-400 rounded">✓ Voted</span>
               : <button
                   onClick={(e) => handleVote(name1Id, e)}
                   disabled={isVoting}
@@ -458,45 +469,37 @@ function MatchupCard({ matchup, status, index, side = 'left', onClick, voterId, 
                   Vote
                 </button>
           )}
-          {status === 'draft' && (
-            <span className="text-[10px] text-gray-500 ml-2">-</span>
-          )}
+          {status === 'draft' && <span className="text-[10px] text-gray-400 ml-2">-</span>}
         </div>
 
-        {/* Progress Bar for Team 1 */}
+        {/* Vote bar for name 1 */}
         {status === 'active' && totalVotes > 0 && (
-          <div className="px-2 pb-1">
+          <div className={`px-2 pb-1 ${winner2 ? 'opacity-40' : ''}`}>
             <div className="flex items-center gap-1">
-              <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-500 transition-all duration-300"
-                  style={{ width: `${percentage1}%` }}
-                ></div>
+              <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${percentage1}%` }} />
               </div>
-              <span className="text-[9px] text-gray-600 font-medium w-8 text-right">
+              <span className="text-[9px] text-gray-600 dark:text-gray-400 font-medium w-8 text-right">
                 {votes1} ({percentage1}%)
               </span>
             </div>
           </div>
         )}
 
-        {/* Team 2 */}
-        <div className={`flex items-center justify-between px-2 py-1 ${
-          placeholder2 ? 'bg-gray-50' : 'hover:bg-purple-50'
-        } transition-colors`}>
+        {/* Name 2 row */}
+        <div className={`flex items-center justify-between px-2 py-1 transition-colors ${row2Bg}`}>
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <span className="text-[10px] font-bold text-gray-600 w-5 text-center">
+            <span className={`text-[10px] font-bold w-5 text-center ${winner1 ? 'text-gray-400' : 'text-gray-600 dark:text-gray-400'}`}>
               {seed2}
             </span>
-            <span className={`text-xs font-medium truncate ${
-              placeholder2 ? 'text-gray-400 italic' : 'text-gray-900'
-            }`}>
+            {winner2 && <span className="text-[10px]">🏆</span>}
+            <span className={`text-xs font-medium truncate ${nameText2}`}>
               {name2}
             </span>
           </div>
-          {status === 'active' && !placeholder2 && (
+          {status === 'active' && !placeholder2 && !winnerId && (
             hasVoted
-              ? <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold text-green-700 bg-green-100 rounded">✓ Voted</span>
+              ? <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold text-green-700 bg-green-100 dark:bg-green-900/40 dark:text-green-400 rounded">✓ Voted</span>
               : <button
                   onClick={(e) => handleVote(name2Id, e)}
                   disabled={isVoting}
@@ -505,22 +508,17 @@ function MatchupCard({ matchup, status, index, side = 'left', onClick, voterId, 
                   Vote
                 </button>
           )}
-          {status === 'draft' && (
-            <span className="text-[10px] text-gray-500 ml-2">-</span>
-          )}
+          {status === 'draft' && <span className="text-[10px] text-gray-400 ml-2">-</span>}
         </div>
 
-        {/* Progress Bar for Team 2 */}
+        {/* Vote bar for name 2 */}
         {status === 'active' && totalVotes > 0 && (
-          <div className="px-2 pb-1">
+          <div className={`px-2 pb-1 ${winner1 ? 'opacity-40' : ''}`}>
             <div className="flex items-center gap-1">
-              <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-purple-500 transition-all duration-300"
-                  style={{ width: `${percentage2}%` }}
-                ></div>
+              <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${percentage2}%` }} />
               </div>
-              <span className="text-[9px] text-gray-600 font-medium w-8 text-right">
+              <span className="text-[9px] text-gray-600 dark:text-gray-400 font-medium w-8 text-right">
                 {votes2} ({percentage2}%)
               </span>
             </div>
@@ -544,14 +542,10 @@ function MatchupCard({ matchup, status, index, side = 'left', onClick, voterId, 
 }
 
 function PlaceholderMatchup({ round, matchup1, matchup2, matchup3, matchup4, status, side = 'left', onClick, isFinal4 = false, label = '' }) {
-  // Helper function to get name from matchup based on status
+  // All matchups are pre-normalised — name1/name2 are always strings
   const getName = (matchup, position) => {
     if (!matchup) return 'N/A';
-    if (status === 'draft') {
-      const nameObj = position === 1 ? matchup.name1 : matchup.name2;
-      return nameObj?.value || nameObj?.name || 'N/A';
-    }
-    return position === 1 ? matchup.name1 : matchup.name2;
+    return (position === 1 ? matchup.name1 : matchup.name2) || 'N/A';
   };
 
   // For Round 2: Winner of matchup1 vs Winner of matchup2
@@ -637,33 +631,27 @@ function PlaceholderMatchup({ round, matchup1, matchup2, matchup3, matchup4, sta
 function MobileMatchupCard({ matchup, status, index, voterId, votedMatchupIds = [], onVoteSuccess }) {
   const [isVoting, setIsVoting] = useState(false);
 
-  const name1 = status === 'draft'
-    ? (matchup.name1?.value || matchup.name1?.name || 'N/A')
-    : matchup.name1;
-  const name2 = status === 'draft'
-    ? (matchup.name2?.value || matchup.name2?.name || 'N/A')
-    : matchup.name2;
-  const seed1 = status === 'draft'
-    ? (matchup.name1?.seed || matchup.name1?.rank || index * 2 + 1)
-    : (matchup.seed1 || index * 2 + 1);
-  const seed2 = status === 'draft'
-    ? (matchup.name2?.seed || matchup.name2?.rank || index * 2 + 2)
-    : (matchup.seed2 || index * 2 + 2);
-  const placeholder1 = status === 'draft' && matchup.name1?.isPlaceholder;
-  const placeholder2 = status === 'draft' && matchup.name2?.isPlaceholder;
+  // All matchups arrive pre-normalised — read flat fields directly
+  const name1       = matchup.name1 || 'TBD';
+  const name2       = matchup.name2 || 'TBD';
+  const seed1       = matchup.seed1 || index * 2 + 1;
+  const seed2       = matchup.seed2 || index * 2 + 2;
+  const placeholder1 = matchup.isPlaceholder1 || false;
+  const placeholder2 = matchup.isPlaceholder2 || false;
+  const name1Id     = matchup.name1Id || null;
+  const name2Id     = matchup.name2Id || null;
+  const matchupId   = matchup._id || matchup.id;
+  const hasVoted    = votedMatchupIds.includes(matchupId);
 
-  // Get vote counts (only for active status)
-  const votes1 = status === 'active' ? (matchup.votes?.name1Votes || 0) : 0;
-  const votes2 = status === 'active' ? (matchup.votes?.name2Votes || 0) : 0;
-  const totalVotes = votes1 + votes2;
+  const votes1      = matchup.votes1 ?? 0;
+  const votes2      = matchup.votes2 ?? 0;
+  const totalVotes  = votes1 + votes2;
   const percentage1 = totalVotes > 0 ? Math.round((votes1 / totalVotes) * 100) : 0;
   const percentage2 = totalVotes > 0 ? Math.round((votes2 / totalVotes) * 100) : 0;
 
-  // Get name IDs for voting (only for active status)
-  const name1Id = status === 'active' ? matchup.name1Id : null;
-  const name2Id = status === 'active' ? matchup.name2Id : null;
-  const matchupId = matchup._id || matchup.id;
-  const hasVoted = votedMatchupIds.includes(matchupId);
+  const winnerId = matchup.winnerId || null;
+  const winner1  = winnerId && winnerId === name1Id;
+  const winner2  = winnerId && winnerId === name2Id;
 
   // Handle vote submission
   const handleVote = async (selectedNameId) => {
@@ -694,28 +682,39 @@ function MobileMatchupCard({ matchup, status, index, voterId, votedMatchupIds = 
     }
   };
 
+  const row1Bg = winner1 ? 'bg-green-50 dark:bg-green-950/30'
+               : winner2 ? 'bg-gray-100 dark:bg-gray-800/50'
+               : '';
+  const row2Bg = winner2 ? 'bg-green-50 dark:bg-green-950/30'
+               : winner1 ? 'bg-gray-100 dark:bg-gray-800/50'
+               : '';
+
   return (
-    <div className="bg-white rounded border border-gray-300 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-      <div className="bg-gray-50 px-3 py-1 border-b border-gray-200">
-        <span className="text-xs font-semibold text-gray-600">Game {index + 1}</span>
+    <div className="bg-white dark:bg-gray-900 rounded border border-gray-300 dark:border-gray-700 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+      <div className="bg-gray-50 dark:bg-gray-800 px-3 py-1 border-b border-gray-200 dark:border-gray-700">
+        <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Game {index + 1}</span>
       </div>
-      
-      {/* Team 1 */}
-      <div className="px-2 py-1.5 border-b border-gray-200">
+
+      {/* Name 1 */}
+      <div className={`px-2 py-1.5 border-b border-gray-200 dark:border-gray-700 ${row1Bg}`}>
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <span className="text-[10px] font-bold text-gray-600 w-5">
+            <span className={`text-[10px] font-bold w-5 ${winner2 ? 'text-gray-400' : 'text-gray-600 dark:text-gray-400'}`}>
               {seed1}
             </span>
+            {winner1 && <span className="text-[10px]">🏆</span>}
             <span className={`text-xs font-medium truncate ${
-              placeholder1 ? 'text-gray-400 italic' : 'text-gray-900'
+              winner1 ? 'text-green-800 dark:text-green-300 font-semibold'
+              : winner2 ? 'text-gray-400 dark:text-gray-600'
+              : placeholder1 ? 'text-gray-400 italic'
+              : 'text-gray-900 dark:text-gray-100'
             }`}>
               {name1}
             </span>
           </div>
-          {status === 'active' && !placeholder1 && (
+          {status === 'active' && !placeholder1 && !winnerId && (
             hasVoted
-              ? <span className="ml-2 px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded">✓ Voted</span>
+              ? <span className="ml-2 px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 dark:bg-green-900/40 dark:text-green-400 rounded">✓ Voted</span>
               : <button
                   onClick={() => handleVote(name1Id)}
                   disabled={isVoting}
@@ -725,38 +724,38 @@ function MobileMatchupCard({ matchup, status, index, voterId, votedMatchupIds = 
                 </button>
           )}
         </div>
-        {/* Progress Bar for Team 1 */}
-        {status === 'active' && totalVotes > 0 && (
-          <div className="flex items-center gap-2 ml-6">
-            <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-blue-500 transition-all duration-300"
-                style={{ width: `${percentage1}%` }}
-              ></div>
+        {totalVotes > 0 && (
+          <div className={`flex items-center gap-2 ml-6 ${winner2 ? 'opacity-40' : ''}`}>
+            <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${percentage1}%` }} />
             </div>
-            <span className="text-[10px] text-gray-600 font-medium">
+            <span className="text-[10px] text-gray-600 dark:text-gray-400 font-medium">
               {votes1} ({percentage1}%)
             </span>
           </div>
         )}
       </div>
 
-      {/* Team 2 */}
-      <div className="px-2 py-1.5">
+      {/* Name 2 */}
+      <div className={`px-2 py-1.5 ${row2Bg}`}>
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <span className="text-[10px] font-bold text-gray-600 w-5">
+            <span className={`text-[10px] font-bold w-5 ${winner1 ? 'text-gray-400' : 'text-gray-600 dark:text-gray-400'}`}>
               {seed2}
             </span>
+            {winner2 && <span className="text-[10px]">🏆</span>}
             <span className={`text-xs font-medium truncate ${
-              placeholder2 ? 'text-gray-400 italic' : 'text-gray-900'
+              winner2 ? 'text-green-800 dark:text-green-300 font-semibold'
+              : winner1 ? 'text-gray-400 dark:text-gray-600'
+              : placeholder2 ? 'text-gray-400 italic'
+              : 'text-gray-900 dark:text-gray-100'
             }`}>
               {name2}
             </span>
           </div>
-          {status === 'active' && !placeholder2 && (
+          {status === 'active' && !placeholder2 && !winnerId && (
             hasVoted
-              ? <span className="ml-2 px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded">✓ Voted</span>
+              ? <span className="ml-2 px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 dark:bg-green-900/40 dark:text-green-400 rounded">✓ Voted</span>
               : <button
                   onClick={() => handleVote(name2Id)}
                   disabled={isVoting}
@@ -766,16 +765,12 @@ function MobileMatchupCard({ matchup, status, index, voterId, votedMatchupIds = 
                 </button>
           )}
         </div>
-        {/* Progress Bar for Team 2 */}
-        {status === 'active' && totalVotes > 0 && (
-          <div className="flex items-center gap-2 ml-6">
-            <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-purple-500 transition-all duration-300"
-                style={{ width: `${percentage2}%` }}
-              ></div>
+        {totalVotes > 0 && (
+          <div className={`flex items-center gap-2 ml-6 ${winner1 ? 'opacity-40' : ''}`}>
+            <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${percentage2}%` }} />
             </div>
-            <span className="text-[10px] text-gray-600 font-medium">
+            <span className="text-[10px] text-gray-600 dark:text-gray-400 font-medium">
               {votes2} ({percentage2}%)
             </span>
           </div>

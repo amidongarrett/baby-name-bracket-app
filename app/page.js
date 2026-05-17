@@ -146,7 +146,7 @@ export default function Home() {
   if (error) return <div className="min-h-screen flex items-center justify-center text-red-600">Error: {error}</div>;
   if (!bracket) return null;
 
-  // Build name lookup map for active mode
+  // Build name lookup map (used for both draft and active normalisation)
   const allNamesList = [
     ...(bracket.owner1Names || []),
     ...(bracket.owner2Names || []),
@@ -154,29 +154,63 @@ export default function Home() {
   ];
   const nameMap = Object.fromEntries(allNamesList.map(n => [n.id, n]));
 
-  let matchupGrid = bracket.status === 'draft'
-    ? previewMatchups
-    : (bracket.matchups?.roundOf32 || []).map((m, i) => {
-        const n1 = nameMap[m.name1Id];
-        const n2 = nameMap[m.name2Id];
-        return {
-          ...m,
-          name1: n1?.value || m.name1 || 'TBD',
-          name2: n2?.value || m.name2 || 'TBD',
-          name1Submitter: n1?.submittedBy || '',
-          name2Submitter: n2?.submittedBy || '',
-          seed1: m.seed1 ?? i * 2 + 1,
-          seed2: m.seed2 ?? i * 2 + 2,
-        };
-      });
+  // March Madness seed pairings in bracket order (matches server seeding algorithm)
+  const SEED_PAIRS = [
+    [1,32],[16,17],[8,25],[9,24],
+    [5,28],[12,21],[4,29],[13,20],
+    [6,27],[11,22],[3,30],[14,19],
+    [7,26],[10,23],[2,31],[15,18],
+  ];
 
-  if (matchupGrid.length === 0) {
-    matchupGrid = Array.from({ length: 16 }, (_, i) => ({
-      _id: `placeholder-${i}`,
-      name1: { value: 'TBD', isPlaceholder: true, seed: i * 2 + 1 },
-      name2: { value: 'TBD', isPlaceholder: true, seed: i * 2 + 2 },
-    }));
-  }
+  /**
+   * Normalise ANY matchup format (client preview objects, server preview MatchupSchema,
+   * or active-mode MatchupSchema) into the flat shape BracketView expects:
+   *   { _id, name1, name2, name1Id, name2Id, seed1, seed2,
+   *     votes1, votes2, winnerId, isPlaceholder1, isPlaceholder2 }
+   */
+  const normalizeMatchup = (m, i) => {
+    // name1 may be an object (client preview) or a string/undefined (server formats)
+    const name1Obj  = m.name1 && typeof m.name1 === 'object' ? m.name1 : null;
+    const name2Obj  = m.name2 && typeof m.name2 === 'object' ? m.name2 : null;
+
+    const n1 = nameMap[m.name1Id] || nameMap[name1Obj?.id];
+    const n2 = nameMap[m.name2Id] || nameMap[name2Obj?.id];
+
+    const [s1default, s2default] = SEED_PAIRS[i] || [i * 2 + 1, i * 2 + 2];
+
+    return {
+      _id: m._id || m.id || `matchup-${i}`,
+      // Resolved display names — try every possible source
+      name1: n1?.value || (typeof m.name1 === 'string' ? m.name1 : null) || name1Obj?.value || name1Obj?.name || 'TBD',
+      name2: n2?.value || (typeof m.name2 === 'string' ? m.name2 : null) || name2Obj?.value || name2Obj?.name || 'TBD',
+      // UUIDs for voting
+      name1Id: m.name1Id || name1Obj?.id || null,
+      name2Id: m.name2Id || name2Obj?.id || null,
+      // Seeds: prefer stored value, then nested object seed, then March Madness default
+      seed1: m.seed1 || name1Obj?.seed || name1Obj?.rank || s1default,
+      seed2: m.seed2 || name2Obj?.seed || name2Obj?.rank || s2default,
+      // Votes — normalise both nested and flat shapes
+      votes1: m.votes1 ?? m.votes?.name1Votes ?? 0,
+      votes2: m.votes2 ?? m.votes?.name2Votes ?? 0,
+      // Winner tracking
+      winnerId: m.winnerId || null,
+      // Placeholder detection
+      isPlaceholder1: name1Obj?.isPlaceholder || false,
+      isPlaceholder2: name2Obj?.isPlaceholder || false,
+    };
+  };
+
+  const rawMatchups = bracket.status === 'draft'
+    ? previewMatchups
+    : (bracket.matchups?.roundOf32 || []);
+
+  let matchupGrid = rawMatchups.length > 0
+    ? rawMatchups.map((m, i) => normalizeMatchup(m, i))
+    : Array.from({ length: 16 }, (_, i) => normalizeMatchup({
+        _id: `placeholder-${i}`,
+        name1: { value: 'TBD', isPlaceholder: true, seed: SEED_PAIRS[i]?.[0] || i * 2 + 1 },
+        name2: { value: 'TBD', isPlaceholder: true, seed: SEED_PAIRS[i]?.[1] || i * 2 + 2 },
+      }, i));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
