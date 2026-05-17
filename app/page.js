@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import BracketView from '@/components/bracket/BracketView';
+import AdminPanel from '@/components/bracket/AdminPanel';
 import { advanceTournamentRound } from '@/utils/api';
+import { computeGuestPredictions } from '@/utils/guestBracket';
+import { useUser } from '@/contexts/UserContext';
 
 const generateVoterId = () =>
   'voter_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
@@ -17,12 +20,18 @@ const ROUND_KEY_MAP = {
 };
 
 export default function Home() {
+  // Role is sourced from UserContext (backed by localStorage under 'userType')
+  const { userType: viewerRole } = useUser();
+
   const [bracket, setBracket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [voterId, setVoterId] = useState(null);
   const [previewMatchups, setPreviewMatchups] = useState([]);
-  const [votedMatchupIds, setVotedMatchupIds] = useState([]);
+  const [voteMap, setVoteMap] = useState({}); // { [matchupId]: selectedNameId }
+  const [ownerPicks, setOwnerPicks] = useState({}); // { [matchupId]: { owner1NameId, owner2NameId } }
+  const [lockedRounds, setLockedRounds] = useState([]);     // rounds this guest has locked in
+  const [publishedRounds, setPublishedRounds] = useState([]); // rounds admin has published
 
   // Persist voterId in localStorage
   useEffect(() => {
@@ -43,7 +52,19 @@ export default function Home() {
       const res = await fetch(`http://localhost:3001/api/votes/user/${id}`);
       if (res.ok) {
         const data = await res.json();
-        setVotedMatchupIds(data.votedMatchupIds || []);
+        setVoteMap(data.voteMap || {});
+        setLockedRounds(data.lockedRounds || []);
+      }
+    } catch {}
+  };
+
+  // Fetch owner picks (only called for owner viewers)
+  const fetchOwnerPicks = async () => {
+    try {
+      const res = await fetch('http://localhost:3001/api/bracket/owner-picks');
+      if (res.ok) {
+        const data = await res.json();
+        setOwnerPicks(data.ownerPicks || {});
       }
     } catch {}
   };
@@ -52,6 +73,12 @@ export default function Home() {
     if (voterId) fetchVotedMatchups(voterId);
   }, [voterId]);
 
+  // Fetch owner picks on role change or bracket status change (all roles — guests need
+  // this to derive whether any owner has voted on a matchup for the lockout UI)
+  useEffect(() => {
+    fetchOwnerPicks();
+  }, [viewerRole, bracket?.status]);
+
   const fetchBracket = async () => {
     try {
       setLoading(true);
@@ -59,6 +86,7 @@ export default function Home() {
       if (!response.ok) throw new Error('Failed to fetch bracket');
       const data = await response.json();
       setBracket(data);
+      setPublishedRounds(data.publishedRounds || []);
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -67,53 +95,43 @@ export default function Home() {
     }
   };
 
-  // Client-side preview fallback (March Madness seeding)
+  // Client-side preview fallback — Division 1: owner1 top-8 vs owner2 bottom-8,
+  // Division 2: owner2 top-8 vs owner1 bottom-8 (matches server seeding algorithm)
   const generateClientPreviewMatchups = (bracketData) => {
     if (!bracketData || bracketData.totalNames !== 32) return [];
 
-    // Interleave H and W by rank: [H#1, W#1, H#2, W#2, ...] so that seed 1
-    // (H#1) and seed 2 (W#1) end up on opposite bracket halves and can only
-    // meet in the Finals.
     const owner1 = bracketData.owner1Names || [];
     const owner2 = bracketData.owner2Names || [];
-    const seenIds = new Set();
-    const allNames = [];
 
-    const maxLen = Math.max(owner1.length, owner2.length);
-    for (let i = 0; i < maxLen; i++) {
-      if (i < owner1.length && !seenIds.has(owner1[i].id)) {
-        seenIds.add(owner1[i].id);
-        allNames.push({ id: owner1[i].id, value: owner1[i].value, submittedBy: owner1[i].submittedBy, rank: i + 1 });
-      }
-      if (i < owner2.length && !seenIds.has(owner2[i].id)) {
-        seenIds.add(owner2[i].id);
-        allNames.push({ id: owner2[i].id, value: owner2[i].value, submittedBy: owner2[i].submittedBy, rank: i + 1 });
-      }
-    }
-    // Add any shared names not yet captured
-    (bracketData.sharedNames || []).forEach((n, i) => {
-      if (!seenIds.has(n.id)) {
-        seenIds.add(n.id);
-        allNames.push({ id: n.id, value: n.value, submittedBy: n.submittedBy, rank: i + 1, isShared: true });
-      }
-    });
-
-    const seeded = allNames.map((n, i) => ({ ...n, seed: i + 1 }));
-    const pairings = [
-      [1,32],[16,17],[8,25],[9,24],
-      [5,28],[12,21],[4,29],[13,20],
-      [6,27],[11,22],[3,30],[14,19],
-      [7,26],[10,23],[2,31],[15,18],
+    // Division 1 seed pairings (8 matchups): H top-8 (seeds 1–8) vs W bottom-8 (seeds 9–16)
+    // Division 2 seed pairings (8 matchups): W top-8 (seeds 1–8) vs H bottom-8 (seeds 9–16)
+    const divPairings = [
+      [1, 16], [8, 9], [4, 13], [5, 12], [2, 15], [7, 10], [3, 14], [6, 11],
     ];
-    return pairings.flatMap(([s1, s2]) => {
-      const n1 = seeded.find(n => n.seed === s1);
-      const n2 = seeded.find(n => n.seed === s2);
-      return n1 && n2 ? [{
-        _id: `preview-${s1}-${s2}`,
-        name1: { value: n1.value, seed: n1.seed, submittedBy: n1.submittedBy, isPlaceholder: false },
-        name2: { value: n2.value, seed: n2.seed, submittedBy: n2.submittedBy, isPlaceholder: false },
-      }] : [];
+
+    const makeMatchup = (nameA, nameB, seedA, seedB, slot) => ({
+      _id: `preview-div${slot >= 8 ? 2 : 1}-${seedA}-${seedB}`,
+      name1: { id: nameA.id, value: nameA.value, seed: seedA, submittedBy: nameA.submittedBy, isPlaceholder: false },
+      name2: { id: nameB.id, value: nameB.value, seed: seedB, submittedBy: nameB.submittedBy, isPlaceholder: false },
     });
+
+    const matchups = [];
+
+    // Division 1: owner1 ranks 1–8 (top) vs owner2 ranks 9–16 (bottom)
+    divPairings.forEach(([s1, s2], idx) => {
+      const n1 = owner1[s1 - 1]; // top: rank 1 = index 0
+      const n2 = owner2[s2 - 1]; // bottom: rank 16 = index 15
+      if (n1 && n2) matchups.push(makeMatchup(n1, n2, s1, s2, idx));
+    });
+
+    // Division 2: owner2 ranks 1–8 (top) vs owner1 ranks 9–16 (bottom)
+    divPairings.forEach(([s1, s2], idx) => {
+      const n1 = owner2[s1 - 1];
+      const n2 = owner1[s2 - 1];
+      if (n1 && n2) matchups.push(makeMatchup(n1, n2, s1, s2, 8 + idx));
+    });
+
+    return matchups;
   };
 
   const fetchPreviewMatchups = async () => {
@@ -143,6 +161,38 @@ export default function Home() {
     }
   };
 
+  const handleGuestLockIn = async (round) => {
+    try {
+      const res = await fetch('http://localhost:3001/api/bracket/guest-lock-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voterId, round }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLockedRounds(data.lockedRounds || []);
+      }
+    } catch {}
+  };
+
+  const handleSetWinner = async (matchupId, winnerId) => {
+    await fetch('http://localhost:3001/api/admin/set-winner', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ matchupId, winnerId }),
+    });
+    await fetchBracket();
+  };
+
+  const handlePublishRound = async (round) => {
+    await fetch('http://localhost:3001/api/admin/publish-round', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ round }),
+    });
+    await Promise.all([fetchBracket(), fetchVotedMatchups(voterId)]);
+  };
+
   const handleAdvanceRound = async () => {
     try {
       setLoading(true);
@@ -160,6 +210,13 @@ export default function Home() {
   useEffect(() => {
     if (bracket?.status === 'draft') fetchPreviewMatchups();
   }, [bracket?.status, bracket?.totalNames]);
+
+  // Compute guest predictions for future-round placeholder slots
+  // Must be declared here (before any early returns) to satisfy React's rules of hooks
+  const guestPredictions = useMemo(() =>
+    computeGuestPredictions(bracket?.matchups, voteMap, publishedRounds),
+    [bracket?.matchups, voteMap, publishedRounds]
+  );
 
   if (loading) {
     return (
@@ -182,12 +239,12 @@ export default function Home() {
   ];
   const nameMap = Object.fromEntries(allNamesList.map(n => [n.id, n]));
 
-  // March Madness seed pairings in bracket order (matches server seeding algorithm)
+  // Seed pairings — 8 matchups per division, seeds 1–16 within each division
   const SEED_PAIRS = [
-    [1,32],[16,17],[8,25],[9,24],
-    [5,28],[12,21],[4,29],[13,20],
-    [6,27],[11,22],[3,30],[14,19],
-    [7,26],[10,23],[2,31],[15,18],
+    // Division 1 (matchups 0–7): H top-8 vs W bottom-8
+    [1, 16], [8, 9], [4, 13], [5, 12], [2, 15], [7, 10], [3, 14], [6, 11],
+    // Division 2 (matchups 8–15): W top-8 vs H bottom-8
+    [1, 16], [8, 9], [4, 13], [5, 12], [2, 15], [7, 10], [3, 14], [6, 11],
   ];
 
   /**
@@ -207,7 +264,7 @@ export default function Home() {
     const [s1default, s2default] = SEED_PAIRS[i] || [i * 2 + 1, i * 2 + 2];
 
     return {
-      _id: m._id || m.id || `matchup-${i}`,
+      _id: m.id || m._id?.toString() || `matchup-${i}`,
       // Resolved display names — try every possible source
       name1: n1?.value || (typeof m.name1 === 'string' ? m.name1 : null) || name1Obj?.value || name1Obj?.name || 'TBD',
       name2: n2?.value || (typeof m.name2 === 'string' ? m.name2 : null) || name2Obj?.value || name2Obj?.name || 'TBD',
@@ -227,6 +284,9 @@ export default function Home() {
       isPlaceholder2: name2Obj?.isPlaceholder || false,
     };
   };
+
+  // Active round key for lock-in and admin panel
+  const activeRoundKey = ROUND_KEY_MAP[bracket?.currentRound] || 'roundOf32';
 
   // For completed tournaments show the championship matchup; otherwise use current round
   const currentRoundKey = bracket.currentRound === 'Completed'
@@ -333,17 +393,41 @@ export default function Home() {
         )}
       </div>
 
+      {/* Admin Panel — owners only */}
+      {(viewerRole === 'owner1' || viewerRole === 'owner2') && (
+        <AdminPanel
+          bracket={bracket}
+          matchupGrid={matchupGrid}
+          nameMap={nameMap}
+          publishedRounds={publishedRounds}
+          activeRoundKey={activeRoundKey}
+          ownerPicks={ownerPicks}
+          onWinnerSet={handleSetWinner}
+          onPublishRound={handlePublishRound}
+        />
+      )}
+
       {/* Bracket */}
       <div className="pb-10">
         <BracketView
           matchups={matchupGrid}
           status={bracket.status}
           voterId={voterId}
-          votedMatchupIds={votedMatchupIds}
+          voteMap={voteMap}
+          viewerRole={viewerRole}
+          ownerPicks={ownerPicks}
+          lockedRounds={lockedRounds}
+          publishedRounds={publishedRounds}
+          activeRoundKey={activeRoundKey}
+          bracketMatchups={bracket?.matchups || {}}
+          nameMap={nameMap}
+          guestPredictions={guestPredictions}
           onVoteSuccess={async () => {
-            await fetchBracket();
-            await fetchVotedMatchups(voterId);
+            const fetches = [fetchBracket(), fetchVotedMatchups(voterId)];
+            if (viewerRole === 'owner1' || viewerRole === 'owner2') fetches.push(fetchOwnerPicks());
+            await Promise.all(fetches);
           }}
+          onGuestLockIn={() => handleGuestLockIn(activeRoundKey)}
         />
       </div>
     </div>
