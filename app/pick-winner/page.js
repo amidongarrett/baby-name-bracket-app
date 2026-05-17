@@ -3,6 +3,14 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
+const ROUND_KEY_MAP = {
+  'Round of 32':  'roundOf32',
+  'Round of 16':  'roundOf16',
+  'Elite 8':      'elite8',
+  'Final 4':      'final4',
+  'Championship': 'championship',
+};
+
 export default function PickWinnerPage() {
   const [bracket, setBracket] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -51,8 +59,10 @@ export default function PickWinnerPage() {
       .forEach(n => { nameMap[n.id] = n; });
   }
 
+  const currentRoundKey = ROUND_KEY_MAP[bracket?.currentRound] || 'roundOf32';
+
   const matchups = bracket?.status === 'active'
-    ? (bracket.matchups?.roundOf32 || []).map((m, i) => {
+    ? (bracket.matchups?.[currentRoundKey] || []).map((m) => {
         const n1 = nameMap[m.name1Id];
         const n2 = nameMap[m.name2Id];
         return {
@@ -90,10 +100,11 @@ export default function PickWinnerPage() {
     if (!allAgreed) return;
     setAdvancing(true);
     try {
+      const roundKey = ROUND_KEY_MAP[bracket?.currentRound] || 'roundOf32';
       const res = await fetch('http://localhost:3001/api/bracket/advance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ round: 'roundOf32' }),
+        body: JSON.stringify({ round: roundKey }),
       });
       if (!res.ok) throw new Error('Failed to advance round');
       localStorage.removeItem('parentPicks');
@@ -145,6 +156,34 @@ export default function PickWinnerPage() {
     );
   }
 
+  // Tournament is complete — show champion screen instead of pick UI
+  if (bracket?.championNameId) {
+    const championName = [...(bracket.owner1Names || []), ...(bracket.owner2Names || []), ...(bracket.sharedNames || [])]
+      .find(n => n.id === bracket.championNameId);
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-amber-50 to-yellow-100 dark:from-gray-950 dark:to-gray-900 flex flex-col items-center justify-center gap-6 px-4 text-center">
+        <div className="text-8xl animate-bounce">🏆</div>
+        <div>
+          <p className="text-sm font-bold uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400 mb-2">
+            Baby Name Bracket Champion
+          </p>
+          <h1 className="text-6xl font-black text-gray-900 dark:text-white tracking-tight mb-3">
+            {championName?.value || 'Champion'}
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 max-w-sm">
+            The tournament is complete! 🎉 This name won the championship.
+          </p>
+        </div>
+        <Link
+          href="/"
+          className="mt-2 px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-lg shadow-lg transition-colors"
+        >
+          View Final Bracket
+        </Link>
+      </div>
+    );
+  }
+
   // ── Main UI ───────────────────────────────────────────────────────────────
 
   return (
@@ -154,7 +193,7 @@ export default function PickWinnerPage() {
       <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
         <div className="max-w-3xl mx-auto px-4 py-6">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-            Pick Winner of Round
+            Pick Winner — {bracket?.currentRound || 'Round of 32'}
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Both parents pick a winner for every matchup. Once you agree, the round can advance.

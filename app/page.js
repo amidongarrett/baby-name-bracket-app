@@ -7,6 +7,15 @@ import { advanceTournamentRound } from '@/utils/api';
 const generateVoterId = () =>
   'voter_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
 
+// Maps bracket.currentRound display labels → API round keys
+const ROUND_KEY_MAP = {
+  'Round of 32':  'roundOf32',
+  'Round of 16':  'roundOf16',
+  'Elite 8':      'elite8',
+  'Final 4':      'final4',
+  'Championship': 'championship',
+};
+
 export default function Home() {
   const [bracket, setBracket] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -137,7 +146,8 @@ export default function Home() {
   const handleAdvanceRound = async () => {
     try {
       setLoading(true);
-      await advanceTournamentRound('roundOf32');
+      const roundKey = ROUND_KEY_MAP[bracket?.currentRound] || 'roundOf32';
+      await advanceTournamentRound(roundKey);
       await fetchBracket();
     } catch (err) {
       setError(err.message);
@@ -218,9 +228,13 @@ export default function Home() {
     };
   };
 
+  // For completed tournaments show the championship matchup; otherwise use current round
+  const currentRoundKey = bracket.currentRound === 'Completed'
+    ? 'championship'
+    : (ROUND_KEY_MAP[bracket.currentRound] || 'roundOf32');
   const rawMatchups = bracket.status === 'draft'
     ? previewMatchups
-    : (bracket.matchups?.roundOf32 || []);
+    : (bracket.matchups?.[currentRoundKey] || []);
 
   let matchupGrid = rawMatchups.length > 0
     ? rawMatchups.map((m, i) => normalizeMatchup(m, i))
@@ -240,15 +254,21 @@ export default function Home() {
               <div className="flex items-center gap-3 mb-1">
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Tournament Bracket</h1>
                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                  bracket.status === 'draft'
+                  bracket.championNameId
                     ? 'bg-yellow-100 text-yellow-800 border border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700'
-                    : 'bg-green-100 text-green-800 border border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700'
+                    : bracket.status === 'draft'
+                      ? 'bg-yellow-100 text-yellow-800 border border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700'
+                      : 'bg-green-100 text-green-800 border border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700'
                 }`}>
-                  {bracket.status === 'draft' ? '📝 Draft' : '🔒 Active — Voting Open'}
+                  {bracket.championNameId
+                    ? '🏆 Champion Crowned!'
+                    : bracket.status === 'draft'
+                      ? '📝 Draft'
+                      : '🔒 Active — Voting Open'}
                 </span>
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                {bracket.totalNames ?? 0} / 32 names · Round of 32
+                {bracket.totalNames ?? 0} / 32 names · {bracket.currentRound || 'Round of 32'}
               </p>
             </div>
 
@@ -272,6 +292,30 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Champion Celebration Banner */}
+      {bracket.championNameId && (
+        <div className="max-w-7xl mx-auto px-4 pt-6">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-yellow-400 via-amber-400 to-yellow-500 shadow-xl p-8 text-center mb-6">
+            {/* Background decoration */}
+            <div className="absolute inset-0 opacity-10 text-9xl flex items-center justify-around pointer-events-none select-none">
+              <span>🏆</span><span>⭐</span><span>🏆</span><span>⭐</span><span>🏆</span>
+            </div>
+            <div className="relative z-10">
+              <div className="text-6xl mb-3">🏆</div>
+              <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-900/70 mb-1">
+                Baby Name Bracket Champion
+              </p>
+              <h2 className="text-5xl font-black text-yellow-900 tracking-tight mb-3">
+                {nameMap[bracket.championNameId]?.value || 'Champion'}
+              </h2>
+              <p className="text-yellow-800 font-medium text-sm">
+                Congratulations — this name won the championship! 🎉
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Info banner */}
       <div className="max-w-7xl mx-auto px-4 pt-5">
         {bracket.status === 'draft' && (
@@ -282,7 +326,7 @@ export default function Home() {
               : ' ✅ Ready — click "Lock & Start Voting" above.'}
           </div>
         )}
-        {bracket.status === 'active' && (
+        {bracket.status === 'active' && !bracket.championNameId && (
           <div className="mb-4 bg-green-50 dark:bg-green-950/30 border-l-4 border-green-500 p-3 rounded text-sm text-green-800 dark:text-green-300">
             <strong>🔒 Bracket Locked.</strong> Guests can now vote on matchups. Use <strong>Admin → Pick Winner of Round</strong> to advance when ready.
           </div>
