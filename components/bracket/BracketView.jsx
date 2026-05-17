@@ -73,8 +73,18 @@ export default function BracketView({ matchups, status, voterId, votedMatchupIds
     dragLocked.current = false;
   };
 
+  // Scroll only the bracket container horizontally — never touches window.scrollY
   const scrollToRound = (ref) => {
-    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    if (!ref.current || !scrollContainerRef.current) return;
+    const container = scrollContainerRef.current;
+    const containerRect = container.getBoundingClientRect();
+    const targetRect   = ref.current.getBoundingClientRect();
+    // Distance from left edge of container to centre of target column, then subtract half container width
+    const scrollTo = container.scrollLeft
+      + (targetRect.left - containerRect.left)
+      + targetRect.width / 2
+      - containerRect.width / 2;
+    container.scrollTo({ left: Math.max(0, scrollTo), behavior: 'smooth' });
   };
 
   return (
@@ -115,7 +125,7 @@ export default function BracketView({ matchups, status, voterId, votedMatchupIds
         <div className="w-full px-4">
           <div
             ref={scrollContainerRef}
-            className={`flex gap-8 overflow-x-auto pb-4 select-none ${
+            className={`flex gap-8 overflow-x-auto pb-40 select-none ${
               isDragging ? 'cursor-grabbing' : 'cursor-grab'
             }`}
             onMouseDown={handleMouseDown}
