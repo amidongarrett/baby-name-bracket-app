@@ -3,6 +3,8 @@ import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { UserProvider } from "@/contexts/UserContext";
+import { BracketProvider } from "@/contexts/BracketContext";
+import AuthGate from "@/components/auth/AuthGate";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,9 +29,11 @@ export default function RootLayout({ children }) {
     >
       <body className="min-h-full flex flex-col">
         <UserProvider>
-          <Navbar />
-          <main className="flex-1">{children}</main>
-          <Footer />
+          <BracketProvider>
+            <Navbar />
+            <main className="flex-1"><AuthGate>{children}</AuthGate></main>
+            <Footer />
+          </BracketProvider>
         </UserProvider>
       </body>
     </html>
