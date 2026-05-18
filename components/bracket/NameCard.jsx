@@ -25,6 +25,8 @@ export default function NameCard({
   momVotedThis,
   guestWrong,
   otherName,
+  feederWrongPick = null,
+  guestCorrect = false,
   votes,
   percentage,
   showVoteBars,
@@ -49,15 +51,22 @@ export default function NameCard({
 
   return (
     <>
+      {feederWrongPick && (
+        <div className="text-[9px] px-2.5 pt-1 text-gray-500">
+          You picked: <span className="line-through text-red-400">{feederWrongPick.guestName}</span>
+          {' → '}
+          <span className="text-green-600 font-semibold">{feederWrongPick.actualName}</span>
+        </div>
+      )}
       {guestWrong && (
         <div className="text-[9px] text-green-600 font-semibold px-2.5 pt-1">
           ✓ Actual: {otherName}
         </div>
       )}
-      <div className={`flex items-center justify-between px-2.5 py-2 ${borderClass} transition-colors ${rowBg}`}>
+      <div className={`flex items-center justify-between px-2.5 py-2 ${borderClass} transition-colors ${rowBg} ${guestCorrect ? 'border-l-4 border-green-500' : ''}`}>
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
           <span className={`text-xs font-bold w-5 text-center shrink-0 ${otherIsWinner ? 'text-gray-400' : 'text-gray-500 dark:text-gray-400'}`}>
-            {seed}
+            {isPlaceholder ? '-' : seed}
           </span>
           {isWinner && <span className="text-xs shrink-0">🏆</span>}
           <span className={`text-sm truncate ${guestWrong ? 'line-through text-red-400 dark:text-red-500' : nameText}`}>

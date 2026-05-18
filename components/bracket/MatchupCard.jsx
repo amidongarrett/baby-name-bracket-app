@@ -16,16 +16,22 @@ export default function MatchupCard({
   isLockedIn = false, isRoundPublished = false,
   slotHeight = 120,
   onVoteSuccess,
+  name1Confirmed = true,
+  name2Confirmed = true,
+  name1FeederWrongPick = null,
+  name2FeederWrongPick = null,
+  connectorSide = null,
 }) {
   const [isVoting, setIsVoting] = useState(false);
 
   // All matchups arrive pre-normalised from app/page.js — read flat fields directly
-  const name1       = matchup.name1  || 'TBD';
-  const name2       = matchup.name2  || 'TBD';
+  // When a slot's feeder hasn't resolved yet, override name to TBD and mark as placeholder
+  const name1       = name1Confirmed ? (matchup.name1 || 'TBD') : 'TBD';
+  const name2       = name2Confirmed ? (matchup.name2 || 'TBD') : 'TBD';
   const seed1       = matchup.seed1  || index * 2 + 1;
   const seed2       = matchup.seed2  || index * 2 + 2;
-  const placeholder1 = matchup.isPlaceholder1 || false;
-  const placeholder2 = matchup.isPlaceholder2 || false;
+  const placeholder1 = !name1Confirmed || matchup.isPlaceholder1 || false;
+  const placeholder2 = !name2Confirmed || matchup.isPlaceholder2 || false;
   const name1Id     = matchup.name1Id || null;
   const name2Id     = matchup.name2Id || null;
   const matchupId   = matchup._id || matchup.id;
@@ -43,8 +49,12 @@ export default function MatchupCard({
   const owner1Pick = picks.owner1NameId || null;
   const owner2Pick = picks.owner2NameId || null;
 
-  // True when any owner has voted on this matchup and the current viewer is a guest
-  const ownerHasVoted = !isOwner && (owner1Pick != null || owner2Pick != null);
+  // True when any owner has voted on this matchup and the current viewer is a guest.
+  // Scoped to Round of 32 only: in Sweet 16+ owner picks are bracket-advancement decisions,
+  // not in-round votes, so the guard must not suppress the guest Vote button.
+  const ownerHasVoted = !isOwner
+    && matchup.round === 'Round of 32'
+    && (owner1Pick != null || owner2Pick != null);
 
   const userVotedNameId = isOwner
     ? (viewerRole === 'owner1' ? owner1Pick : owner2Pick)
@@ -69,10 +79,15 @@ export default function MatchupCard({
   const guestWrongOnName2 = !isOwner && isRoundPublished && winner1 && votedForName2;
   const hasWrongPick = guestWrongOnName1 || guestWrongOnName2;
 
+  // Correct pick visualization — owners never get "correct pick" styling
+  const guestCorrectOnName1 = !isOwner && isRoundPublished && winner1 && votedForName1;
+  const guestCorrectOnName2 = !isOwner && isRoundPublished && winner2 && votedForName2;
+
   // Owners can always re-vote (to resolve conflicts) until winner is set; guests until lock-in
-  const canVote = status === 'active' && !effectiveWinnerId && (
-    isOwner ? true : !isLockedIn
-  );
+  // Both name slots must be confirmed before voting is permitted on this card
+  const canVote = status === 'active' && !effectiveWinnerId
+    && name1Confirmed && name2Confirmed
+    && (isOwner ? true : !isLockedIn);
   const hasConflict = isOwner && owner1Pick && owner2Pick && owner1Pick !== owner2Pick;
   const dadVotedName1 = owner1Pick === name1Id;
   const dadVotedName2 = owner1Pick === name2Id;
@@ -128,8 +143,8 @@ export default function MatchupCard({
     }
   };
 
-  // Determine connector positions based on side
-  const isLeftSide = side === 'left';
+  // Determine connector positions based on side (connectorSide overrides side when provided)
+  const isLeftSide = connectorSide !== null ? connectorSide === 'left' : side === 'left';
   const connectorPos = isLeftSide ? 'left-full' : 'right-full';
   const connectorBorder = isLeftSide ? 'border-r-2' : 'border-l-2';
 
@@ -168,6 +183,8 @@ export default function MatchupCard({
           momVotedThis={momVotedName1}
           guestWrong={guestWrongOnName1}
           otherName={name2}
+          guestCorrect={guestCorrectOnName1}
+          feederWrongPick={name1FeederWrongPick}
           votes={votes1}
           percentage={percentage1}
           showVoteBars={showVoteBars}
@@ -198,6 +215,8 @@ export default function MatchupCard({
           momVotedThis={momVotedName2}
           guestWrong={guestWrongOnName2}
           otherName={name1}
+          guestCorrect={guestCorrectOnName2}
+          feederWrongPick={name2FeederWrongPick}
           votes={votes2}
           percentage={percentage2}
           showVoteBars={showVoteBars}

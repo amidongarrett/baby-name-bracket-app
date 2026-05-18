@@ -8,6 +8,60 @@
 import { useRef, useState } from 'react';
 import MatchupCard from './MatchupCard';
 
+/**
+ * Derives the current vote leader from a raw feeder matchup.
+ * Returns { nameId, name, seed } or null (tied / no votes).
+ * @param {object} feeder  - raw entry from bracketMatchups.roundOf32 or roundOf16
+ * @param {object} nameMap - nameId → { value } display map
+ * @param {number} slotBase - the ordinal index of this feeder in its round array,
+ *                            used to derive seeds when the feeder is a raw API object.
+ */
+function getFeederLeader(feeder, nameMap, slotBase) {
+  if (!feeder) return null;
+
+  const n1Votes = feeder.votes?.name1Votes ?? 0;
+  const n2Votes = feeder.votes?.name2Votes ?? 0;
+
+  // Determine which side is the leader
+  let leadSide; // 'name1' | 'name2' | null
+  if (feeder.winnerId) {
+    // Official winner takes precedence
+    if (feeder.winnerId === feeder.name1Id) leadSide = 'name1';
+    else if (feeder.winnerId === feeder.name2Id) leadSide = 'name2';
+    else return null; // winnerId doesn't match either slot — defensive
+  } else if (n1Votes > n2Votes) {
+    leadSide = 'name1';
+  } else if (n2Votes > n1Votes) {
+    leadSide = 'name2';
+  } else {
+    return null; // tied or 0-0
+  }
+
+  if (leadSide === 'name1') {
+    return {
+      nameId: feeder.name1Id || null,
+      name:   nameMap[feeder.name1Id]?.value || 'TBD',
+      seed:   slotBase * 2 + 1,
+    };
+  } else {
+    return {
+      nameId: feeder.name2Id || null,
+      name:   nameMap[feeder.name2Id]?.value || 'TBD',
+      seed:   slotBase * 2 + 2,
+    };
+  }
+}
+
+function getFeederWrongPick(feeder, leader, voteMap, nameMap) {
+  if (!feeder || !leader || !feeder.winnerId) return null;
+  const feederId = feeder.id || feeder._id?.toString();
+  const guestVotedId = voteMap[feederId];
+  if (!guestVotedId || guestVotedId === feeder.winnerId) return null;
+  const guestName = nameMap[guestVotedId]?.value;
+  if (!guestName) return null;
+  return { guestName, actualName: leader.name };
+}
+
 export default function BracketView({
   matchups, status, voterId,
   voteMap = {}, viewerRole = 'guest', ownerPicks = {},
@@ -45,9 +99,20 @@ export default function BracketView({
 
   // Top-level owner flag (used when passing to PlaceholderMatchup)
   const isOwner = viewerRole === 'owner1' || viewerRole === 'owner2';
+  const isGuest = !isOwner;
 
   const SLOT_HEIGHT = 130; // px per R32 slot
   const TOTAL_HEIGHT = 8 * SLOT_HEIGHT; // 1040px — shared by ALL round columns
+  const F4_CARD_HEIGHT       = 88;  // approximate rendered height of a two-row F4 / Championship card (px)
+  const F4_LABEL_HEIGHT      = 20;  // height of the outer "Division 1 / 2 / CHAMPIONSHIP" label div (text-xs + mb-1)
+  const CHAMP_SUBTITLE_HEIGHT = 24; // extra "Division 1 vs Division 2" subtitle inside the Championship card (text-xs + mb-2)
+  // Elite 8 cards sit in flex items-center rows of height 4*SLOT_HEIGHT (520px).
+  // Top E8 card center = 2*SLOT_HEIGHT = 260px; bottom E8 card center = 6*SLOT_HEIGHT = 780px.
+  // F4 wrapper top is positioned so that: wrapper_top + F4_LABEL_HEIGHT + F4_CARD_HEIGHT/2 = E8 card center.
+  const F4_DIV1_TOP = 2 * SLOT_HEIGHT - F4_LABEL_HEIGHT - F4_CARD_HEIGHT / 2; // 196px
+  const F4_DIV2_TOP = 6 * SLOT_HEIGHT - F4_LABEL_HEIGHT - F4_CARD_HEIGHT / 2; // 716px
+  // Championship card body bottom = wrapper_top + outer label + inner subtitle + card body
+  const CHAMP_BODY_BOTTOM = TOTAL_HEIGHT / 2 - SLOT_HEIGHT / 2 + F4_LABEL_HEIGHT + CHAMP_SUBTITLE_HEIGHT + F4_CARD_HEIGHT;
 
   // Guest lock-in / publish state — hoisted here so per-round flags aren't recomputed inside loops
   const isLockedIn      = lockedRounds.includes(activeRoundKey);
@@ -180,7 +245,7 @@ export default function BracketView({
             onMouseLeave={handleMouseLeave}
           >
             {/* DIVISION 1 SIDE - Left to Right */}
-            
+
             {/* Round of 32 - Division 1 */}
             <div className="flex-shrink-0 w-[280px]" ref={owner1R1Ref}>
               <h3
@@ -242,13 +307,30 @@ export default function BracketView({
                       className="flex items-center"
                     >
                       <div className="relative w-full">
-                        {r16MatchupExists && activeMatchup ? (
+                        {r16MatchupExists && activeMatchup ? (() => {
+                          const r32Feeders = bracketMatchups.roundOf32 || [];
+                          const leader1 = getFeederLeader(r32Feeders[i * 2],     nameMap, i * 2);
+                          const leader2 = getFeederLeader(r32Feeders[i * 2 + 1], nameMap, i * 2 + 1);
+                          const name1FWP = isGuest ? getFeederWrongPick(r32Feeders[i * 2],     leader1, voteMap, nameMap) : null;
+                          const name2FWP = isGuest ? getFeederWrongPick(r32Feeders[i * 2 + 1], leader2, voteMap, nameMap) : null;
+                          const name1Confirmed = !!leader1;
+                          const name2Confirmed = !!leader2;
+                          const resolvedMatchup = {
+                            ...activeMatchup,
+                            name1:   leader1 ? leader1.name   : 'TBD',
+                            name1Id: leader1 ? leader1.nameId : activeMatchup.name1Id,
+                            seed1:   leader1 ? leader1.seed   : activeMatchup.seed1,
+                            name2:   leader2 ? leader2.name   : 'TBD',
+                            name2Id: leader2 ? leader2.nameId : activeMatchup.name2Id,
+                            seed2:   leader2 ? leader2.seed   : activeMatchup.seed2,
+                          };
+                          return (
                           <MatchupCard
-                            matchup={activeMatchup}
+                            matchup={resolvedMatchup}
                             status={status}
                             index={i}
                             side="left"
-                            slotHeight={SLOT_HEIGHT}
+                            slotHeight={2 * SLOT_HEIGHT}
                             voterId={voterId}
                             voteMap={voteMap}
                             viewerRole={viewerRole}
@@ -256,8 +338,13 @@ export default function BracketView({
                             isLockedIn={isR16Locked}
                             isRoundPublished={isR16Published}
                             onVoteSuccess={onVoteSuccess}
+                            name1Confirmed={name1Confirmed}
+                            name2Confirmed={name2Confirmed}
+                            name1FeederWrongPick={name1FWP}
+                            name2FeederWrongPick={name2FWP}
                           />
-                        ) : (
+                          );
+                        })() : (
                           <PlaceholderMatchup
                             round={2}
                             matchup1={matchup1}
@@ -301,13 +388,30 @@ export default function BracketView({
                       className="flex items-center"
                     >
                       <div className="relative w-full">
-                        {e8MatchupExists && activeMatchup ? (
+                        {e8MatchupExists && activeMatchup ? (() => {
+                          const r16Feeders = bracketMatchups.roundOf16 || [];
+                          const leader1 = getFeederLeader(r16Feeders[i * 2],     nameMap, i * 2);
+                          const leader2 = getFeederLeader(r16Feeders[i * 2 + 1], nameMap, i * 2 + 1);
+                          const name1FWP = isGuest ? getFeederWrongPick(r16Feeders[i * 2],     leader1, voteMap, nameMap) : null;
+                          const name2FWP = isGuest ? getFeederWrongPick(r16Feeders[i * 2 + 1], leader2, voteMap, nameMap) : null;
+                          const name1Confirmed = !!leader1;
+                          const name2Confirmed = !!leader2;
+                          const resolvedMatchup = {
+                            ...activeMatchup,
+                            name1:   leader1 ? leader1.name   : 'TBD',
+                            name1Id: leader1 ? leader1.nameId : activeMatchup.name1Id,
+                            seed1:   leader1 ? leader1.seed   : activeMatchup.seed1,
+                            name2:   leader2 ? leader2.name   : 'TBD',
+                            name2Id: leader2 ? leader2.nameId : activeMatchup.name2Id,
+                            seed2:   leader2 ? leader2.seed   : activeMatchup.seed2,
+                          };
+                          return (
                           <MatchupCard
-                            matchup={activeMatchup}
+                            matchup={resolvedMatchup}
                             status={status}
                             index={i}
                             side="left"
-                            slotHeight={SLOT_HEIGHT}
+                            slotHeight={4 * SLOT_HEIGHT}
                             voterId={voterId}
                             voteMap={voteMap}
                             viewerRole={viewerRole}
@@ -315,8 +419,13 @@ export default function BracketView({
                             isLockedIn={isE8Locked}
                             isRoundPublished={isE8Published}
                             onVoteSuccess={onVoteSuccess}
+                            name1Confirmed={name1Confirmed}
+                            name2Confirmed={name2Confirmed}
+                            name1FeederWrongPick={name1FWP}
+                            name2FeederWrongPick={name2FWP}
                           />
-                        ) : (
+                          );
+                        })() : (
                           <PlaceholderMatchup
                             round={3}
                             matchup1={owner1Matchups[matchup1Index]}
@@ -340,105 +449,146 @@ export default function BracketView({
               </div>
             </div>
 
-            {/* Final 4 - Single Column with both matchups */}
-            <div className="flex-shrink-0 w-[320px]" ref={championshipRef}>
+            {/* Final 4 + Championship — single center column */}
+            <div
+              className="flex-shrink-0 w-[280px] relative"
+              ref={championshipRef}
+              style={{ height: `${TOTAL_HEIGHT + 28}px` }}
+            >
+              {/* Column header */}
               <h3
-                className="text-sm font-bold text-purple-600 mb-4 text-center cursor-pointer hover:text-purple-700 transition-colors"
+                className="text-sm font-bold text-indigo-600 mb-4 text-center cursor-pointer hover:text-indigo-700 transition-colors"
                 onClick={() => scrollToRound(championshipRef)}
               >
-                FINAL 4
+                FINAL 4 / CHAMPIONSHIP
               </h3>
-              {/* Two Final 4 slots each span half of TOTAL_HEIGHT so their centres
-                  align with the midpoints of the two Elite 8 column groups. */}
-              <div className="flex flex-col" style={{ height: `${TOTAL_HEIGHT}px` }}>
-                {/* Division 1 Final 4 Matchup — vertically centred in top half */}
-                <div className="flex items-center justify-center" style={{ height: `${TOTAL_HEIGHT / 2}px` }}>
-                  <div className="w-full">
-                    <PlaceholderMatchup
-                      round={4}
-                      matchup1={owner1Matchups[0]}
-                      matchup2={owner1Matchups[1]}
-                      matchup3={owner1Matchups[2]}
-                      matchup4={owner1Matchups[3]}
-                      prediction={guestPredictions?.final4?.[0] || null}
-                      nameMap={nameMap}
-                      isOwner={isOwner}
-                      status={status}
-                      side="center"
-                      onClick={() => scrollToRound(championshipRef)}
-                      isFinal4={true}
-                      label="Division 1"
-                    />
-                  </div>
+
+              {/* Inner region positioned relative to this spacer div below the header */}
+              <div className="relative" style={{ height: `${TOTAL_HEIGHT}px` }}>
+
+                {/* F4 Div1 card — top aligned with top Elite 8 card center (2*SLOT_HEIGHT = 260px) */}
+                <div
+                  className="absolute w-full"
+                  style={{ top: `${F4_DIV1_TOP}px` }}
+                >
+                  <div className="text-xs font-semibold text-gray-600 mb-1 text-center">Division 1</div>
+                  <PlaceholderMatchup
+                    round={4}
+                    matchup1={owner1Matchups[0]}
+                    matchup2={owner1Matchups[1]}
+                    matchup3={owner1Matchups[2]}
+                    matchup4={owner1Matchups[3]}
+                    prediction={guestPredictions?.final4?.[0] || null}
+                    nameMap={nameMap}
+                    isOwner={isOwner}
+                    status={status}
+                    side="center"
+                    onClick={() => scrollToRound(championshipRef)}
+                    isFinal4={true}
+                    label=""
+                  />
                 </div>
 
-                {/* Division 2 Final 4 Matchup — vertically centred in bottom half */}
-                <div className="flex items-center justify-center" style={{ height: `${TOTAL_HEIGHT / 2}px` }}>
-                  <div className="w-full">
-                    <PlaceholderMatchup
-                      round={4}
-                      matchup1={owner2Matchups[0]}
-                      matchup2={owner2Matchups[1]}
-                      matchup3={owner2Matchups[2]}
-                      matchup4={owner2Matchups[3]}
-                      prediction={guestPredictions?.final4?.[1] || null}
-                      nameMap={nameMap}
-                      isOwner={isOwner}
-                      status={status}
-                      side="center"
-                      onClick={() => scrollToRound(championshipRef)}
-                      isFinal4={true}
-                      label="Division 2"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Championship Below Final 4 */}
-              <div className="mt-8">
-                <h3 className="text-sm font-bold text-gray-600 mb-4 text-center">
-                  CHAMPIONSHIP
-                </h3>
-                <PlaceholderMatchup
-                  round={5}
-                  prediction={guestPredictions?.championship?.[0] || null}
-                  nameMap={nameMap}
-                  isOwner={isOwner}
-                  status={status}
-                  side="center"
-                  onClick={() => scrollToRound(championshipRef)}
-                  isChampionship={true}
+                {/* Vertical connector: F4 Div1 bottom → Championship top */}
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 w-0.5 bg-gray-300 hidden xl:block"
+                  style={{
+                    top:    `${F4_DIV1_TOP + F4_LABEL_HEIGHT + F4_CARD_HEIGHT}px`,
+                    height: `${TOTAL_HEIGHT / 2 - SLOT_HEIGHT / 2 - (F4_DIV1_TOP + F4_LABEL_HEIGHT + F4_CARD_HEIGHT)}px`,
+                  }}
                 />
 
-                {/* Guest Lock-In */}
-                {status === 'active' && viewerRole === 'guest' && !isLockedIn && (
-                  <div className="mt-6 text-center">
-                    <p className="text-xs text-gray-500 mb-2">
-                      {allVoted
-                        ? 'All picks made! Lock in to see how others voted.'
-                        : `${votedCount} / ${votableMatchups.length} matchups picked`}
-                    </p>
-                    <button
-                      onClick={onGuestLockIn}
-                      disabled={!allVoted}
-                      className="px-6 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-lg shadow hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-sm"
-                    >
-                      Lock In My Picks
-                    </button>
+                {/* Championship card */}
+                <div
+                  className="absolute w-full"
+                  style={{ top: `${TOTAL_HEIGHT / 2 - SLOT_HEIGHT / 2}px` }}
+                >
+                  <div className="text-xs font-semibold text-yellow-600 mb-1 text-center">CHAMPIONSHIP</div>
+                  <PlaceholderMatchup
+                    round={5}
+                    prediction={guestPredictions?.championship?.[0] || null}
+                    nameMap={nameMap}
+                    isOwner={isOwner}
+                    status={status}
+                    side="center"
+                    onClick={() => scrollToRound(championshipRef)}
+                    isChampionship={true}
+                  />
+                </div>
+
+                {/* Lock-in block — positioned to the right of the Championship card */}
+                {status === 'active' && viewerRole === 'guest' && (
+                  <div
+                    className="absolute"
+                    style={{
+                      top:  `${TOTAL_HEIGHT / 2 - SLOT_HEIGHT / 2}px`,
+                      left: 'calc(100% + 8px)',
+                      width: '160px',
+                    }}
+                  >
+                    {!isLockedIn && (
+                      <div className="text-center">
+                        <p className="text-xs text-gray-500 mb-2">
+                          {allVoted
+                            ? 'All picks made! Lock in to see how others voted.'
+                            : `${votedCount} / ${votableMatchups.length} matchups picked`}
+                        </p>
+                        <button
+                          onClick={onGuestLockIn}
+                          disabled={!allVoted}
+                          className="px-6 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-lg shadow hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+                        >
+                          Lock In My Picks
+                        </button>
+                      </div>
+                    )}
+                    {isLockedIn && (
+                      <div className="text-center pt-4">
+                        <span className="px-4 py-2 text-sm font-semibold text-green-700 bg-green-100 rounded-lg border border-green-300">
+                          Picks Locked In
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
-                {status === 'active' && viewerRole === 'guest' && isLockedIn && (
-                  <div className="mt-6 text-center">
-                    <span className="px-4 py-2 text-sm font-semibold text-green-700 bg-green-100 rounded-lg border border-green-300">
-                      Picks Locked In
-                    </span>
-                  </div>
-                )}
-              </div>
+
+                {/* Vertical connector: Championship bottom → F4 Div2 top */}
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 w-0.5 bg-gray-300 hidden xl:block"
+                  style={{
+                    top:    `${CHAMP_BODY_BOTTOM}px`,
+                    height: `${F4_DIV2_TOP - CHAMP_BODY_BOTTOM}px`,
+                  }}
+                />
+
+                {/* F4 Div2 card — top aligned with bottom Elite 8 card center (6*SLOT_HEIGHT = 780px) */}
+                <div
+                  className="absolute w-full"
+                  style={{ top: `${F4_DIV2_TOP}px` }}
+                >
+                  <div className="text-xs font-semibold text-gray-600 mb-1 text-center">Division 2</div>
+                  <PlaceholderMatchup
+                    round={4}
+                    matchup1={owner2Matchups[0]}
+                    matchup2={owner2Matchups[1]}
+                    matchup3={owner2Matchups[2]}
+                    matchup4={owner2Matchups[3]}
+                    prediction={guestPredictions?.final4?.[1] || null}
+                    nameMap={nameMap}
+                    isOwner={isOwner}
+                    status={status}
+                    side="center"
+                    onClick={() => scrollToRound(championshipRef)}
+                    isFinal4={true}
+                    label=""
+                  />
+                </div>
+
+              </div>{/* end inner relative region */}
             </div>
 
             {/* DIVISION 2 SIDE - Right to Left (reverse order) */}
-            
+
             {/* Elite 8 - Division 2 */}
             <div className="flex-shrink-0 w-[280px]" ref={owner2R3Ref}>
               <h3
@@ -461,13 +611,32 @@ export default function BracketView({
                       className="flex items-center"
                     >
                       <div className="relative w-full">
-                        {e8MatchupExists && activeMatchup ? (
+                        {e8MatchupExists && activeMatchup ? (() => {
+                          const r16Feeders = bracketMatchups.roundOf16 || [];
+                          const globalR16Base = 4 + i * 2;
+                          const leader1 = getFeederLeader(r16Feeders[globalR16Base],     nameMap, globalR16Base);
+                          const leader2 = getFeederLeader(r16Feeders[globalR16Base + 1], nameMap, globalR16Base + 1);
+                          const name1FWP = isGuest ? getFeederWrongPick(r16Feeders[globalR16Base],     leader1, voteMap, nameMap) : null;
+                          const name2FWP = isGuest ? getFeederWrongPick(r16Feeders[globalR16Base + 1], leader2, voteMap, nameMap) : null;
+                          const name1Confirmed = !!leader1;
+                          const name2Confirmed = !!leader2;
+                          const resolvedMatchup = {
+                            ...activeMatchup,
+                            name1:   leader1 ? leader1.name   : 'TBD',
+                            name1Id: leader1 ? leader1.nameId : activeMatchup.name1Id,
+                            seed1:   leader1 ? leader1.seed   : activeMatchup.seed1,
+                            name2:   leader2 ? leader2.name   : 'TBD',
+                            name2Id: leader2 ? leader2.nameId : activeMatchup.name2Id,
+                            seed2:   leader2 ? leader2.seed   : activeMatchup.seed2,
+                          };
+                          return (
                           <MatchupCard
-                            matchup={activeMatchup}
+                            matchup={resolvedMatchup}
                             status={status}
                             index={2 + i}
                             side="right"
-                            slotHeight={SLOT_HEIGHT}
+                            connectorSide="left"
+                            slotHeight={4 * SLOT_HEIGHT}
                             voterId={voterId}
                             voteMap={voteMap}
                             viewerRole={viewerRole}
@@ -475,8 +644,13 @@ export default function BracketView({
                             isLockedIn={isE8Locked}
                             isRoundPublished={isE8Published}
                             onVoteSuccess={onVoteSuccess}
+                            name1Confirmed={name1Confirmed}
+                            name2Confirmed={name2Confirmed}
+                            name1FeederWrongPick={name1FWP}
+                            name2FeederWrongPick={name2FWP}
                           />
-                        ) : (
+                          );
+                        })() : (
                           <PlaceholderMatchup
                             round={3}
                             matchup1={owner2Matchups[matchup1Index]}
@@ -488,7 +662,6 @@ export default function BracketView({
                             isOwner={isOwner}
                             status={status}
                             side="right"
-                            connectorSide="left"
                             pmIndex={i}
                             slotHeight={4 * SLOT_HEIGHT}
                             onClick={() => scrollToRound(owner2R3Ref)}
@@ -525,13 +698,31 @@ export default function BracketView({
                       className="flex items-center"
                     >
                       <div className="relative w-full">
-                        {r16MatchupExists && activeMatchup ? (
+                        {r16MatchupExists && activeMatchup ? (() => {
+                          const r32Feeders = bracketMatchups.roundOf32 || [];
+                          const globalIdx = 4 + i;
+                          const leader1 = getFeederLeader(r32Feeders[globalIdx * 2],     nameMap, globalIdx * 2);
+                          const leader2 = getFeederLeader(r32Feeders[globalIdx * 2 + 1], nameMap, globalIdx * 2 + 1);
+                          const name1FWP = isGuest ? getFeederWrongPick(r32Feeders[globalIdx * 2],     leader1, voteMap, nameMap) : null;
+                          const name2FWP = isGuest ? getFeederWrongPick(r32Feeders[globalIdx * 2 + 1], leader2, voteMap, nameMap) : null;
+                          const name1Confirmed = !!leader1;
+                          const name2Confirmed = !!leader2;
+                          const resolvedMatchup = {
+                            ...activeMatchup,
+                            name1:   leader1 ? leader1.name   : 'TBD',
+                            name1Id: leader1 ? leader1.nameId : activeMatchup.name1Id,
+                            seed1:   leader1 ? leader1.seed   : activeMatchup.seed1,
+                            name2:   leader2 ? leader2.name   : 'TBD',
+                            name2Id: leader2 ? leader2.nameId : activeMatchup.name2Id,
+                            seed2:   leader2 ? leader2.seed   : activeMatchup.seed2,
+                          };
+                          return (
                           <MatchupCard
-                            matchup={activeMatchup}
+                            matchup={resolvedMatchup}
                             status={status}
                             index={4 + i}
                             side="right"
-                            slotHeight={SLOT_HEIGHT}
+                            slotHeight={2 * SLOT_HEIGHT}
                             voterId={voterId}
                             voteMap={voteMap}
                             viewerRole={viewerRole}
@@ -539,8 +730,13 @@ export default function BracketView({
                             isLockedIn={isR16Locked}
                             isRoundPublished={isR16Published}
                             onVoteSuccess={onVoteSuccess}
+                            name1Confirmed={name1Confirmed}
+                            name2Confirmed={name2Confirmed}
+                            name1FeederWrongPick={name1FWP}
+                            name2FeederWrongPick={name2FWP}
                           />
-                        ) : (
+                          );
+                        })() : (
                           <PlaceholderMatchup
                             round={2}
                             matchup1={matchup1}
@@ -620,7 +816,7 @@ export default function BracketView({
               onVoteSuccess={onVoteSuccess}
             />
           ))}
-          
+
           {/* Mobile Championship */}
           <div className="mt-8 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-lg border-2 border-yellow-400 p-4 text-center">
             <h3 className="text-lg font-bold text-gray-800 mb-1">🏆 Championship</h3>
@@ -657,30 +853,79 @@ export default function BracketView({
   );
 }
 
-function TBDCard({ side, onClick, isFinal4 = false, isChampionship = false, label = '' }) {
-  const connectorPos = side === 'left' ? 'left-full' : 'right-full';
+function TBDCard({
+  side,
+  onClick,
+  isFinal4 = false,
+  isChampionship = false,
+  label = '',
+  round = 0,
+  pmIndex = 0,
+  slotHeight = 120,
+  connectorSide = null,
+}) {
+  // connectorSide overrides side for connector direction only
+  const effectiveConnectorSide = connectorSide ?? side;
+  const isLeftSide = effectiveConnectorSide === 'left';
+  const connectorPos    = isLeftSide ? 'left-full' : 'right-full';
+  const connectorBorder = isLeftSide ? 'border-r-2' : 'border-l-2';
+
   const cardClasses = isFinal4
-    ? 'bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg border-2 border-indigo-300 overflow-hidden opacity-90 hover:opacity-100 hover:shadow-lg transition-all cursor-pointer'
+    ? 'bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/40 rounded-lg border-2 border-indigo-300 dark:border-indigo-700 overflow-hidden opacity-90 hover:opacity-100 hover:shadow-lg transition-all cursor-pointer'
     : isChampionship
-      ? 'bg-gradient-to-r from-yellow-50 to-amber-50 rounded-lg border-2 border-yellow-400 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer'
-      : 'bg-white rounded border border-dashed border-gray-300 overflow-hidden opacity-60 hover:opacity-80 transition-opacity cursor-pointer';
+      ? 'bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-950/40 dark:to-amber-950/40 rounded-lg border-2 border-yellow-400 dark:border-yellow-700 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer'
+      : 'bg-white dark:bg-gray-900 rounded border border-dashed border-gray-300 dark:border-gray-700 overflow-hidden opacity-60 hover:opacity-80 transition-opacity cursor-pointer';
 
   return (
     <div className="relative">
-      {!isFinal4 && !isChampionship && (
-        <div className={`absolute ${connectorPos} top-1/2 w-8 h-0.5 bg-gray-300 hidden xl:block`} />
+      {/* Connector lines toward the next round — only for non-terminal cards */}
+      {round < 4 && !isFinal4 && !isChampionship && (
+        <>
+          {/*
+            Horizontal stub pointing to the next round.
+            - round 1 (R32→S16): only a stub, no L-shape — render always.
+            - round 2 (S16→E8): the L-shape below has border-t-2/border-b-2 that already
+              draws the horizontal segment, so we suppress the stub here to avoid doubling.
+            - round 3 (E8→F4): straight stub only (no L-shape) — render always.
+          */}
+          {round !== 2 && (
+            <div className={`absolute ${connectorPos} top-1/2 w-8 h-0.5 bg-gray-300 hidden xl:block`} />
+          )}
+
+          {/*
+            Vertical L-shape connectors: only for Sweet 16 → Elite 8 (round 2).
+            Elite 8 → Final 4 (round 3) uses a straight stub because each Elite 8 card
+            feeds a different Final 4 cell — they are not bracket-paired with each other.
+          */}
+          {round === 2 && pmIndex % 2 === 0 && (
+            <div className={`absolute ${connectorPos} top-1/2 hidden xl:block`}>
+              <div
+                className={`w-8 ${connectorBorder} border-t-2 border-gray-300`}
+                style={{ height: `${slotHeight / 2}px` }}
+              />
+            </div>
+          )}
+          {round === 2 && pmIndex % 2 === 1 && (
+            <div className={`absolute ${connectorPos} bottom-1/2 hidden xl:block`}>
+              <div
+                className={`w-8 ${connectorBorder} border-b-2 border-gray-300`}
+                style={{ height: `${slotHeight / 2}px` }}
+              />
+            </div>
+          )}
+        </>
       )}
       {isFinal4 && label && (
-        <div className="text-xs font-semibold text-gray-600 mb-2 text-center">{label}</div>
+        <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 text-center">{label}</div>
       )}
       {isChampionship && (
-        <div className="text-xs font-semibold text-gray-600 mb-2 text-center">Division 1 vs Division 2</div>
+        <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 text-center">Division 1 vs Division 2</div>
       )}
       <div className={cardClasses} onClick={onClick}>
         {[1, 2].map(n => (
           <div
             key={n}
-            className={`flex items-center justify-between px-3 py-2 ${n === 1 ? 'border-b border-gray-200' : ''} ${isFinal4 ? (n === 1 ? 'bg-white/50' : 'bg-white/30') : ''}`}
+            className={`flex items-center justify-between px-3 py-2 ${n === 1 ? 'border-b border-gray-200' : ''} ${isFinal4 ? (n === 1 ? 'bg-white/50 dark:bg-white/5' : 'bg-white/30 dark:bg-white/5') : ''}`}
           >
             <div className="flex items-center gap-1.5 flex-1 min-w-0">
               <span className={`${isFinal4 || isChampionship ? 'text-xs' : 'text-[10px]'} font-bold text-gray-400 w-5 text-center`}>-</span>
@@ -713,7 +958,8 @@ function PlaceholderMatchup({
   const guestName1 = prediction?.guestName1Id ? nameMap[prediction.guestName1Id]?.value : null;
   const guestName2 = prediction?.guestName2Id ? nameMap[prediction.guestName2Id]?.value : null;
 
-  // If no guest predictions yet, render the TBD fallback
+  // If no guest predictions yet, render the TBD fallback — pass connector props through
+  // so TBDCard can draw the same L-shape bracket connectors as the prediction path.
   if (!guestName1 && !guestName2) {
     return (
       <TBDCard
@@ -722,6 +968,10 @@ function PlaceholderMatchup({
         isFinal4={isFinal4}
         isChampionship={isChampionship}
         label={label}
+        round={round}
+        pmIndex={pmIndex}
+        slotHeight={slotHeight}
+        connectorSide={connectorSide}
       />
     );
   }
@@ -739,10 +989,21 @@ function PlaceholderMatchup({
     <div className="relative">
       {round < 4 && (
         <>
-          {/* Horizontal connector to next round */}
-          <div className={`absolute ${connectorPos} top-1/2 w-8 h-0.5 bg-gray-300 hidden xl:block`} />
+          {/*
+            Horizontal stub pointing to the next round.
+            - round 2 (S16→E8): suppressed here because the L-shape below already draws
+              the horizontal segment via border-t-2/border-b-2, preventing double-bold lines.
+            - round 3 (E8→F4): rendered; no L-shape is drawn for this round.
+          */}
+          {round !== 2 && (
+            <div className={`absolute ${connectorPos} top-1/2 w-8 h-0.5 bg-gray-300 hidden xl:block`} />
+          )}
 
-          {/* Vertical bracket L-shape (S16→E8 and E8→F4) */}
+          {/*
+            L-shape bracket connectors: Sweet 16 → Elite 8 only (round 2).
+            Elite 8 → Final 4 (round 3) does NOT use L-shapes because each Elite 8 card
+            feeds a different Final 4 cell — they are not bracket-paired with each other.
+          */}
           {round === 2 && pmIndex % 2 === 0 && (
             <div className={`absolute ${connectorPos} top-1/2 hidden xl:block`}>
               <div
@@ -752,22 +1013,6 @@ function PlaceholderMatchup({
             </div>
           )}
           {round === 2 && pmIndex % 2 === 1 && (
-            <div className={`absolute ${connectorPos} bottom-1/2 hidden xl:block`}>
-              <div
-                className={`w-8 ${connectorBorder} border-b-2 border-gray-300`}
-                style={{ height: `${slotHeight / 2}px` }}
-              />
-            </div>
-          )}
-          {round === 3 && pmIndex % 2 === 0 && (
-            <div className={`absolute ${connectorPos} top-1/2 hidden xl:block`}>
-              <div
-                className={`w-8 ${connectorBorder} border-t-2 border-gray-300`}
-                style={{ height: `${slotHeight / 2}px` }}
-              />
-            </div>
-          )}
-          {round === 3 && pmIndex % 2 === 1 && (
             <div className={`absolute ${connectorPos} bottom-1/2 hidden xl:block`}>
               <div
                 className={`w-8 ${connectorBorder} border-b-2 border-gray-300`}
