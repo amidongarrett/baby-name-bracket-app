@@ -4,13 +4,20 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useUser } from '@/contexts/UserContext';
+import { useBracket } from '@/contexts/BracketContext';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef  = useRef(null);
   const pathname = usePathname();
 
-  const { userType, setUserType, isOwner, displayEmoji, displayName, userTypes } = useUser();
+  const {
+    displayName,
+    logout,
+    user,
+  } = useUser();
+
+  const { isOwnerOfCurrentBracket, ownerRole, currentBracketId } = useBracket();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -23,10 +30,15 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const adminLinks = [
-    { href: '/bracket',     icon: '📝', label: 'Names',                description: 'Add & manage name submissions' },
-    { href: '/pick-winner', icon: '🏅', label: 'Pick Winner of Round', description: 'Agree on winners to advance'   },
-  ];
+  const adminLinks = currentBracketId ? [
+    { href: `/bracket/${currentBracketId}/names`,       icon: '📝', label: 'Names',                description: 'Add & manage name submissions' },
+    { href: `/bracket/${currentBracketId}/pick-winner`, icon: '🏅', label: 'Pick Winner of Round', description: 'Agree on winners to advance'   },
+  ] : [];
+
+  function handleSignOut() {
+    setIsOpen(false);
+    logout();
+  }
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/80 backdrop-blur-md dark:border-gray-800 dark:bg-black/80">
@@ -42,7 +54,7 @@ export default function Navbar() {
             <span className="text-lg">Baby Name Bracket</span>
           </Link>
 
-          {/* Menu button — always visible; shows current user identity */}
+          {/* Menu button — shows authenticated user's display name */}
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setIsOpen(prev => !prev)}
@@ -54,7 +66,9 @@ export default function Navbar() {
                   : 'text-gray-600 hover:bg-gray-100 hover:text-foreground dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-foreground'
               }`}
             >
-              <span className="hidden sm:inline text-xs">{displayEmoji} {displayName}</span>
+              <span className="hidden sm:inline text-xs">
+                {isOwnerOfCurrentBracket ? '👑' : '👤'} {user?.displayName || displayName}
+              </span>
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
                 {isOpen
                   ? <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -67,31 +81,28 @@ export default function Navbar() {
             {isOpen && (
               <div className="absolute right-0 mt-2 w-72 rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 overflow-hidden">
 
-                {/* ── User type switcher ────────────────────────────────── */}
-                {/* TODO (auth): replace this section with a login/logout UI  */}
+                {/* ── All Brackets ──────────────────────────────────────── */}
+                <div className="px-2 py-2 border-b border-gray-100 dark:border-gray-800">
+                  <Link
+                    href="/"
+                    onClick={() => setIsOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    <span>🏠</span>
+                    <span>All Brackets</span>
+                  </Link>
+                </div>
+
+                {/* ── User identity ─────────────────────────────────────── */}
                 <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-2">
-                    Viewing As
+                  <p className="text-sm font-semibold text-foreground">{user?.displayName}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {isOwnerOfCurrentBracket ? (ownerRole === 'owner1' ? '👑 Owner 1' : '👑 Owner 2') : '👤 Guest'}
                   </p>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {userTypes.map(({ id, emoji, label }) => (
-                      <button
-                        key={id}
-                        onClick={() => setUserType(id)}
-                        className={`py-1.5 px-1 text-xs font-semibold rounded-lg transition-colors truncate ${
-                          userType === id
-                            ? 'bg-indigo-600 text-white shadow-sm'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                        }`}
-                      >
-                        {emoji} {label}
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
                 {/* ── Parent controls (owners only) ─────────────────────── */}
-                {isOwner ? (
+                {isOwnerOfCurrentBracket && (
                   <>
                     <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-800">
                       <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">
@@ -122,11 +133,17 @@ export default function Navbar() {
                       ))}
                     </div>
                   </>
-                ) : (
-                  <div className="px-4 py-3 text-xs text-center text-gray-400 dark:text-gray-500">
-                    Switch to Husband or Wife above to access parent controls.
-                  </div>
                 )}
+
+                {/* ── Sign out ──────────────────────────────────────────── */}
+                <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-3">
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full rounded-lg px-3 py-2 text-sm font-medium text-left text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                  >
+                    Sign out
+                  </button>
+                </div>
 
               </div>
             )}
