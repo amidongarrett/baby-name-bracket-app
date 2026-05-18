@@ -11,8 +11,15 @@ export default function AdminPanel({
   ownerPicks = {},
   onWinnerSet,
   onPublishRound,
+  onUnlockNames,
+  isOpen: isOpenProp,
+  onToggle,
 }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [localOpen, setLocalOpen] = useState(false);
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+
+  const open = isOpenProp !== undefined ? isOpenProp : localOpen;
+  const toggle = onToggle ?? (() => setLocalOpen(p => !p));
 
   const isRoundPublished = publishedRounds.includes(activeRoundKey);
 
@@ -28,7 +35,7 @@ export default function AdminPanel({
       <div className="bg-white dark:bg-gray-900 rounded-lg border border-yellow-300 dark:border-yellow-700 shadow-sm overflow-hidden">
         {/* Panel Header / Toggle */}
         <button
-          onClick={() => setIsOpen(prev => !prev)}
+          onClick={toggle}
           className="w-full flex items-center justify-between px-4 py-3 bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-colors"
         >
           <div className="flex items-center gap-2">
@@ -42,7 +49,7 @@ export default function AdminPanel({
             )}
           </div>
           <svg
-            className={`w-5 h-5 text-yellow-700 dark:text-yellow-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+            className={`w-5 h-5 text-yellow-700 dark:text-yellow-400 transition-transform ${open ? 'rotate-180' : ''}`}
             fill="none"
             viewBox="0 0 24 24"
             strokeWidth="2"
@@ -53,7 +60,7 @@ export default function AdminPanel({
         </button>
 
         {/* Collapsible Body */}
-        {isOpen && (
+        {open && (
           <div className="p-4">
             {votableMatchups.length === 0 ? (
               <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
@@ -198,6 +205,48 @@ export default function AdminPanel({
               >
                 🔄 Reset & Regenerate Bracket
               </button>
+
+              {bracket.status !== 'draft' && (
+                <>
+                  <button
+                    onClick={() => setShowUnlockModal(true)}
+                    className="mt-2 px-4 py-2 bg-orange-600 text-white text-xs font-bold rounded hover:bg-orange-700 transition-colors"
+                  >
+                    🔓 Unlock Names
+                  </button>
+
+                  {showUnlockModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+                        <h2 className="text-lg font-bold text-red-600 mb-2">Unlock Names?</h2>
+                        <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">
+                          This will permanently erase <strong>all votes</strong> and <strong>all matchups</strong>.
+                          The bracket will return to draft mode so names can be edited again.
+                          This cannot be undone.
+                        </p>
+                        <div className="flex gap-3 justify-end">
+                          <button
+                            onClick={() => setShowUnlockModal(false)}
+                            className="px-4 py-2 text-sm rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={async () => {
+                              setShowUnlockModal(false);
+                              await fetch('http://localhost:3001/api/admin/unlock-names', { method: 'POST' });
+                              onUnlockNames();
+                            }}
+                            className="px-4 py-2 text-sm font-bold rounded bg-red-600 text-white hover:bg-red-700"
+                          >
+                            Yes, Unlock
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         )}

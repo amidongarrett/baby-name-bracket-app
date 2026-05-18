@@ -30,17 +30,18 @@ export async function lockTournamentBracket() {
 /**
  * Advance the tournament bracket to the next round
  * @param {string} round - The target round to advance to
+ * @param {string} bracketId - The bracket ID to advance
  * @returns {Promise<Object>} The parsed JSON response from the API
  * @throws {Error} If the request fails or returns a non-ok status
  */
-export async function advanceTournamentRound(round) {
+export async function advanceTournamentRound(round, bracketId) {
   try {
     const response = await fetch('http://localhost:3001/api/bracket/advance', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ round }),
+      body: JSON.stringify({ round, bracketId }),
     });
 
     if (!response.ok) {
