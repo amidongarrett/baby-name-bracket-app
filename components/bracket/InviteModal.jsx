@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useUser } from '@/contexts/UserContext';
 import EmailPillInput from './EmailPillInput';
 
@@ -15,6 +16,9 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
  */
 export default function InviteModal({ bracketId, onClose }) {
   const { token } = useUser();
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [pills, setPills]         = useState([]);
   const [shareLink, setShareLink] = useState(null);
@@ -82,7 +86,8 @@ export default function InviteModal({ bracketId, onClose }) {
     }
   }
 
-  return (
+  if (!mounted) return null;
+  return createPortal(
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
       <div className="flex min-h-full items-center justify-center px-4 py-6">
         <div className="w-full max-w-md rounded-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -172,6 +177,7 @@ export default function InviteModal({ bracketId, onClose }) {
         </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
