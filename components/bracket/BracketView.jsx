@@ -829,7 +829,6 @@ export default function BracketView({
             </div>
           </div>
         </div>
-      </div>
     </>
   );
 }
