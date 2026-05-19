@@ -18,39 +18,24 @@ const ROUND_KEY_MAP = {
 export default function BracketPickWinnerPage({ params }) {
   const { id: bracketId } = use(params);
 
-  const { user } = useUser();
+  const { user, token } = useUser();
   const { setCurrentBracket, isOwnerOfCurrentBracket, ownerRole } = useBracket();
 
   const isOwner = isOwnerOfCurrentBracket;
-  const userType = ownerRole; // 'owner1' | 'owner2' | null — used as picks key
   const displayName = user?.displayName;
   const displayEmoji = isOwner ? '👑' : '👤';
 
   const [bracket, setBracket]   = useState(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(null);
-  const [picks, setPicks]       = useState({});
+  const [owner1Bracket, setOwner1Bracket] = useState(null);
+  const [owner2Bracket, setOwner2Bracket] = useState(null);
   const [advancing, setAdvancing] = useState(false);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => setCurrentBracket(null);
   }, []);
-
-  // Hydrate picks from localStorage on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('parentPicks');
-      if (stored) setPicks(JSON.parse(stored));
-    } catch {}
-  }, []);
-
-  // Persist picks whenever they change
-  useEffect(() => {
-    if (Object.keys(picks).length > 0) {
-      localStorage.setItem('parentPicks', JSON.stringify(picks));
-    }
-  }, [picks]);
 
   const fetchBracket = async () => {
     try {
@@ -69,6 +54,19 @@ export default function BracketPickWinnerPage({ params }) {
   };
 
   useEffect(() => { fetchBracket(); }, []);
+
+  const fetchOwnerBrackets = async () => {
+    if (!bracketId || !bracket?.owner1UserId) return;
+    const headers = { Authorization: `Bearer ${token}` };
+    const [r1, r2] = await Promise.all([
+      fetch(`${BASE_URL}/api/bracket/${bracketId}/my-bracket?userId=${bracket.owner1UserId}`, { headers }),
+      fetch(`${BASE_URL}/api/bracket/${bracketId}/my-bracket?userId=${bracket.owner2UserId}`, { headers }),
+    ]);
+    if (r1.ok) setOwner1Bracket(await r1.json());
+    if (r2.ok) setOwner2Bracket(await r2.json());
+  };
+
+  useEffect(() => { fetchOwnerBrackets(); }, [bracket?.owner1UserId]);
 
   // ── Derived data ──────────────────────────────────────────────────────────
 
@@ -94,22 +92,21 @@ export default function BracketPickWinnerPage({ params }) {
       })
     : [];
 
-  const getStatus = (matchup) => {
-    const p = picks[matchup._id];
-    if (!p?.owner1 && !p?.owner2) return 'unpicked';
-    if (p?.owner1 && p?.owner2) return p.owner1 === p.owner2 ? 'agreed' : 'disagreed';
+  const getStatus = (position) => {
+    const owner1Pick = owner1Bracket?.picks?.[currentRoundKey]?.[position] || null;
+    const owner2Pick = owner2Bracket?.picks?.[currentRoundKey]?.[position] || null;
+    if (!owner1Pick && !owner2Pick) return 'unpicked';
+    if (owner1Pick && owner2Pick) return owner1Pick === owner2Pick ? 'agreed' : 'disagreed';
     return 'partial';
   };
 
-  const agreedCount    = matchups.filter(m => getStatus(m) === 'agreed').length;
-  const disagreedCount = matchups.filter(m => getStatus(m) === 'disagreed').length;
+  const agreedCount    = matchups.filter((_, i) => getStatus(i) === 'agreed').length;
+  const disagreedCount = matchups.filter((_, i) => getStatus(i) === 'disagreed').length;
   const allAgreed      = matchups.length > 0 && agreedCount === matchups.length;
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
   const handleResetPicks = async () => {
-    localStorage.removeItem('parentPicks');
-    setPicks({});
     try {
       await fetch(`${BASE_URL}/api/bracket/reset-round`, {
         method: 'POST',
@@ -117,17 +114,32 @@ export default function BracketPickWinnerPage({ params }) {
         body: JSON.stringify({ bracketId }),
       });
       await fetchBracket();
+      setOwner1Bracket(null);
+      setOwner2Bracket(null);
     } catch {
-      // Silently ignore — local reset still applied
+      // Silently ignore
     }
   };
 
-  const handlePick = (matchupId, nameId) => {
+  const handlePick = async (matchupId, position, selectedNameId) => {
     if (!isOwner) return;
-    setPicks(prev => ({
-      ...prev,
-      [matchupId]: { ...prev[matchupId], [userType]: nameId },
-    }));
+    try {
+      const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}/my-bracket/pick`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          userId: user.id,
+          round: currentRoundKey,
+          position,
+          selectedNameId,
+        }),
+      });
+      if (res.ok) {
+        if (ownerRole === 'owner1') setOwner1Bracket(await res.json());
+        else setOwner2Bracket(await res.json());
+        await fetchOwnerBrackets();
+      }
+    } catch (err) { console.error(err); }
   };
 
   const handleAdvance = async () => {
@@ -141,8 +153,8 @@ export default function BracketPickWinnerPage({ params }) {
         body: JSON.stringify({ round: roundKey, bracketId }),
       });
       if (!res.ok) throw new Error('Failed to advance round');
-      localStorage.removeItem('parentPicks');
-      setPicks({});
+      setOwner1Bracket(null);
+      setOwner2Bracket(null);
       await fetchBracket();
     } catch (err) {
       setError(err.message);
@@ -255,8 +267,8 @@ export default function BracketPickWinnerPage({ params }) {
                 {agreedCount} agreed
               </span>
               {disagreedCount > 0 && (
-                <span className="flex items-center gap-1.5 font-medium text-orange-600 dark:text-orange-400">
-                  <span className="w-2 h-2 rounded-full bg-orange-500 inline-block" />
+                <span className="flex items-center gap-1.5 font-medium text-red-600 dark:text-red-400">
+                  <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
                   {disagreedCount} disagreed
                 </span>
               )}
@@ -264,7 +276,7 @@ export default function BracketPickWinnerPage({ params }) {
                 {matchups.length - agreedCount - disagreedCount} unpicked
               </span>
             </div>
-            {Object.keys(picks).length > 0 && isOwner && (
+            {isOwner && (
               <button
                 onClick={handleResetPicks}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
@@ -289,28 +301,29 @@ export default function BracketPickWinnerPage({ params }) {
 
         {/* Matchup cards */}
         {matchups.map((matchup, index) => {
-          const status     = getStatus(matchup);
-          const pick       = picks[matchup._id] || {};
-          const totalVotes = matchup.votes1 + matchup.votes2;
+          const status      = getStatus(index);
+          const owner1Pick  = owner1Bracket?.picks?.[currentRoundKey]?.[index] || null;
+          const owner2Pick  = owner2Bracket?.picks?.[currentRoundKey]?.[index] || null;
+          const totalVotes  = matchup.votes1 + matchup.votes2;
           const pct1       = totalVotes > 0 ? Math.round((matchup.votes1 / totalVotes) * 100) : 50;
           const pct2       = 100 - pct1;
 
           const cardBorder = {
-            agreed:   'border-green-400  dark:border-green-600  bg-green-50  dark:bg-green-950/30',
-            disagreed:'border-orange-400 dark:border-orange-600 bg-orange-50 dark:bg-orange-950/30',
+            agreed:   'border-green-500  dark:border-green-600  bg-green-50  dark:bg-green-950/30',
+            disagreed:'border-red-500    dark:border-red-600    bg-red-50    dark:bg-red-950/30',
             partial:  'border-gray-200   dark:border-gray-700   bg-white     dark:bg-gray-900',
             unpicked: 'border-gray-200   dark:border-gray-700   bg-white     dark:bg-gray-900',
           }[status];
 
           const renderNameOption = (nameId, nameValue, votes, pct, colorScheme) => {
-            const isPickedByOwner1 = pick.owner1 === nameId;
-            const isPickedByOwner2 = pick.owner2 === nameId;
+            const isPickedByOwner1 = owner1Pick === nameId;
+            const isPickedByOwner2 = owner2Pick === nameId;
             const isHighlighted    = isPickedByOwner1 || isPickedByOwner2;
             const { border, bg, bar, hoverBorder } = colorScheme;
 
             return (
               <button
-                onClick={() => handlePick(matchup._id, nameId)}
+                onClick={() => handlePick(matchup._id, index, nameId)}
                 disabled={!isOwner}
                 className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-all ${
                   isHighlighted
@@ -335,12 +348,12 @@ export default function BracketPickWinnerPage({ params }) {
                 <div className="flex gap-2 min-h-[20px]">
                   {isPickedByOwner1 && (
                     <span className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-medium">
-                      👨 Husband
+                      O1
                     </span>
                   )}
                   {isPickedByOwner2 && (
                     <span className="text-xs bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full font-medium">
-                      👩 Wife
+                      O2
                     </span>
                   )}
                 </div>
@@ -362,13 +375,13 @@ export default function BracketPickWinnerPage({ params }) {
                     </span>
                   )}
                   {status === 'disagreed' && (
-                    <span className="text-xs font-semibold text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/40 px-2.5 py-1 rounded-full">
+                    <span className="text-xs font-semibold text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/40 px-2.5 py-1 rounded-full">
                       ⚠️ Disagreement — keep talking!
                     </span>
                   )}
                   {status === 'partial' && (
                     <span className="text-xs text-gray-400">
-                      Waiting for {!pick.owner1 ? 'Husband' : 'Wife'}…
+                      Waiting for {!owner1Pick ? 'O1' : 'O2'}…
                     </span>
                   )}
                 </div>
