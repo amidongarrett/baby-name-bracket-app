@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function ListMatchupCard({
   matchup, status, index, voterId,
@@ -73,29 +72,15 @@ export default function ListMatchupCard({
   const momVotedName1 = owner2Pick === name1Id;
   const momVotedName2 = owner2Pick === name2Id;
 
-  // Handle pick submission (guest) or owner vote
+  // Handle pick submission for all roles via onPick callback
   const handleVote = async (selectedNameId) => {
     if (!selectedNameId || status !== 'active' || isVoting) return;
     if (!isOwner && isLocked) return;
-    if (!isOwner && !onPick) return;
+    if (!onPick) return;
 
     setIsVoting(true);
     try {
-      if (isOwner) {
-        // Owner picks go through the legacy owner-picks endpoint
-        const rolePayload = viewerRole === 'owner1' ? 'Owner 1' : 'Owner 2';
-        const response = await fetch(`${BASE_URL}/api/votes/${matchupId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ voterId, selectedNameId, role: rolePayload }),
-        });
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Failed to submit vote');
-        }
-      } else {
-        await onPick(activeRoundKey, index, selectedNameId);
-      }
+      await onPick(activeRoundKey, index, selectedNameId);
     } catch (error) {
       console.error('Pick submission error:', error);
       alert(`Failed to submit pick: ${error.message}`);
