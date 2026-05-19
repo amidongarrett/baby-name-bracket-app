@@ -6,11 +6,19 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useUser } from '@/contexts/UserContext';
 import { useBracket } from '@/contexts/BracketContext';
 import InviteModal from '@/components/bracket/InviteModal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [activePanel, setActivePanel] = useState('main'); // 'main' | 'settings' | 'profile'
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showDeleteBracketModal, setShowDeleteBracketModal] = useState(false);
+  const [showRemoveOwner2Modal, setShowRemoveOwner2Modal] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [dangerLoading, setDangerLoading] = useState(false);
   const menuRef  = useRef(null);
   const buttonRef = useRef(null);
   const pathname = usePathname();
@@ -22,7 +30,7 @@ export default function Navbar() {
     user,
   } = useUser();
 
-  const { isOwnerOfCurrentBracket, currentBracketId } = useBracket();
+  const { isOwnerOfCurrentBracket, currentBracketId, currentBracket, ownerRole } = useBracket();
 
   function closeMenu() {
     setIsOpen(false);
@@ -50,7 +58,7 @@ export default function Navbar() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const adminLinks = currentBracketId ? [
+  const ownerLinks = currentBracketId ? [
     { href: `/bracket/${currentBracketId}/names`,       icon: '📝', label: 'Names',                description: 'Add & manage name submissions' },
     { href: `/bracket/${currentBracketId}/pick-winner`, icon: '🏅', label: 'Pick Winner of Round', description: 'Agree on winners to advance'   },
   ] : [];
@@ -63,6 +71,42 @@ export default function Navbar() {
   function navigate(href) {
     closeMenu();
     router.push(href);
+  }
+
+  async function handleDeleteBracket() {
+    setDangerLoading(true);
+    await fetch(`${BASE_URL}/api/bracket/${currentBracketId}`, { method: 'DELETE' });
+    setDangerLoading(false);
+    window.location.href = '/';
+  }
+
+  async function handleRemoveOwner2() {
+    setDangerLoading(true);
+    await fetch(`${BASE_URL}/api/bracket/${currentBracketId}/owner2`, { method: 'DELETE' });
+    setDangerLoading(false);
+    window.location.reload();
+  }
+
+  async function handleResetAndRegenerate() {
+    setDangerLoading(true);
+    await fetch(`${BASE_URL}/api/admin/reset-and-regenerate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bracketId: currentBracketId }),
+    });
+    setDangerLoading(false);
+    window.location.reload();
+  }
+
+  async function handleUnlockNames() {
+    setDangerLoading(true);
+    await fetch(`${BASE_URL}/api/admin/unlock-names`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bracketId: currentBracketId }),
+    });
+    setDangerLoading(false);
+    window.location.reload();
   }
 
   return (
@@ -196,11 +240,11 @@ export default function Navbar() {
                     </div>
                     <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-800">
                       <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">
-                        Parent Controls
+                        Settings
                       </p>
                     </div>
                     <div className="py-1">
-                      {adminLinks.map(link => (
+                      {ownerLinks.map(link => (
                         <Link
                           key={link.href}
                           href={link.href}
@@ -221,7 +265,7 @@ export default function Navbar() {
                           )}
                         </Link>
                       ))}
-                      {isOwnerOfCurrentBracket && currentBracketId && (
+                      {currentBracketId && (
                         <button
                           onClick={() => { closeMenu(); setShowInviteModal(true); }}
                           className="flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -234,6 +278,41 @@ export default function Navbar() {
                         </button>
                       )}
                     </div>
+                    {ownerRole === 'owner1' && (
+                      <div className="px-4 py-3 border-t border-red-100 dark:border-red-900/40">
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-red-400 mb-3">
+                          Danger Zone
+                        </p>
+                        <div className="flex flex-col gap-2">
+                          <button
+                            onClick={() => setShowResetModal(true)}
+                            className="w-full px-3 py-2 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 transition-colors text-left"
+                          >
+                            Reset &amp; Regenerate
+                          </button>
+                          {currentBracket?.status !== 'draft' && (
+                            <button
+                              onClick={() => setShowUnlockModal(true)}
+                              className="w-full px-3 py-2 bg-orange-600 text-white text-xs font-bold rounded hover:bg-orange-700 transition-colors text-left"
+                            >
+                              Unlock Names
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setShowRemoveOwner2Modal(true)}
+                            className="w-full px-3 py-2 bg-amber-600 text-white text-xs font-bold rounded hover:bg-amber-700 transition-colors text-left"
+                          >
+                            Remove Owner 2
+                          </button>
+                          <button
+                            onClick={() => setShowDeleteBracketModal(true)}
+                            className="w-full px-3 py-2 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 transition-colors text-left"
+                          >
+                            Delete Bracket
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
 
@@ -282,6 +361,46 @@ export default function Navbar() {
         <InviteModal
           bracketId={currentBracketId}
           onClose={() => setShowInviteModal(false)}
+        />
+      )}
+      {showDeleteBracketModal && (
+        <ConfirmModal
+          title="Delete Bracket"
+          message="This permanently deletes all names, matchups, and votes. This cannot be undone."
+          confirmLabel="Yes, Delete"
+          onConfirm={async () => { await handleDeleteBracket(); setShowDeleteBracketModal(false); }}
+          onCancel={() => setShowDeleteBracketModal(false)}
+          loading={dangerLoading}
+        />
+      )}
+      {showRemoveOwner2Modal && (
+        <ConfirmModal
+          title="Remove Owner 2"
+          message="This clears all Owner 2 names, resets shared-name flags, and reverts the bracket to draft with no matchups."
+          confirmLabel="Yes, Remove"
+          onConfirm={async () => { await handleRemoveOwner2(); setShowRemoveOwner2Modal(false); }}
+          onCancel={() => setShowRemoveOwner2Modal(false)}
+          loading={dangerLoading}
+        />
+      )}
+      {showResetModal && (
+        <ConfirmModal
+          title="Reset &amp; Regenerate"
+          message="This will delete all votes and regenerate the bracket with the current seeding algorithm. This cannot be undone."
+          confirmLabel="Yes, Reset"
+          onConfirm={async () => { await handleResetAndRegenerate(); setShowResetModal(false); }}
+          onCancel={() => setShowResetModal(false)}
+          loading={dangerLoading}
+        />
+      )}
+      {showUnlockModal && (
+        <ConfirmModal
+          title="Unlock Names?"
+          message="This will permanently erase all votes and all matchups. The bracket will return to draft mode so names can be edited again. This cannot be undone."
+          confirmLabel="Yes, Unlock"
+          onConfirm={async () => { await handleUnlockNames(); setShowUnlockModal(false); }}
+          onCancel={() => setShowUnlockModal(false)}
+          loading={dangerLoading}
         />
       )}
     </nav>

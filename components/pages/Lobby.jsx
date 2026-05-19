@@ -103,7 +103,7 @@ function CreateModal({ user, token, onClose, onCreated }) {
               type="text"
               value={owner2Name}
               onChange={(e) => setOwner2Name(e.target.value)}
-              placeholder="e.g. Ashley"
+              placeholder="e.g. Theresa"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>

@@ -8,7 +8,6 @@ const BracketContext = createContext(null);
 export function BracketProvider({ children }) {
   const { user } = useUser();
   const [currentBracket, setCurrentBracket] = useState(null);
-  const [adminPanelOpen, setAdminPanelOpen] = useState(false);
 
   const isOwnerOfCurrentBracket =
     !!user &&
@@ -29,8 +28,6 @@ export function BracketProvider({ children }) {
     isOwnerOfCurrentBracket,
     ownerRole,
     currentBracketId,
-    adminPanelOpen,
-    setAdminPanelOpen,
   };
 
   return (

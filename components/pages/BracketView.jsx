@@ -3,11 +3,12 @@
 import { useState, useEffect, useMemo, use } from 'react';
 import Link from 'next/link';
 import BracketView from '@/components/bracket/BracketView';
-import AdminPanel from '@/components/bracket/AdminPanel';
+import BracketListView from '@/components/bracket/BracketListView';
 import { advanceTournamentRound } from '@/utils/api';
 import { computeGuestPredictions } from '@/utils/guestBracket';
 import { useUser } from '@/contexts/UserContext';
 import { useBracket } from '@/contexts/BracketContext';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -29,7 +30,7 @@ export default function BracketIdPage({ params }) {
 
   // Role is sourced from UserContext (backed by localStorage under 'userType')
   const { userType: viewerRole } = useUser();
-  const { setCurrentBracket, isOwnerOfCurrentBracket, adminPanelOpen, setAdminPanelOpen } = useBracket();
+  const { setCurrentBracket, isOwnerOfCurrentBracket } = useBracket();
 
   const [bracket, setBracket] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -40,6 +41,20 @@ export default function BracketIdPage({ params }) {
   const [ownerPicks, setOwnerPicks] = useState({}); // { [matchupId]: { owner1NameId, owner2NameId } }
   const [lockedRounds, setLockedRounds] = useState([]);     // rounds this guest has locked in
   const [publishedRounds, setPublishedRounds] = useState([]); // rounds admin has published
+  const [showDeleteGuestModal, setShowDeleteGuestModal] = useState(false);
+  const [viewMode, setViewMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('bracketViewMode');
+      if (stored) return stored;
+      return window.innerWidth < 768 ? 'list' : 'bracket';
+    }
+    return 'bracket';
+  });
+
+  const handleViewModeChange = (mode) => {
+    setViewMode(mode);
+    localStorage.setItem('bracketViewMode', mode);
+  };
 
   // Persist voterId in localStorage
   useEffect(() => {
@@ -186,26 +201,21 @@ export default function BracketIdPage({ params }) {
     } catch {}
   };
 
-  const handleSetWinner = async (matchupId, winnerId) => {
-    await fetch(`${BASE_URL}/api/admin/set-winner`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ matchupId, winnerId, bracketId }),
-    });
-    await fetchBracket();
-  };
-
-  const handlePublishRound = async (round) => {
-    await fetch(`${BASE_URL}/api/admin/publish-round`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ round, bracketId }),
-    });
-    await Promise.all([fetchBracket(), fetchVotedMatchups(voterId)]);
-  };
-
-  const handleUnlockNames = async () => {
-    await fetchBracket();
+  const handleDeleteGuestSession = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}/guest`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guestId: voterId }),
+      });
+      if (!res.ok) throw new Error('Failed to remove guest session');
+      setVoteMap({});
+      setLockedRounds([]);
+      localStorage.removeItem('voterId');
+      setVoterId(null);
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   const handleAdvanceRound = async () => {
@@ -342,6 +352,30 @@ export default function BracketIdPage({ params }) {
             </div>
 
             <div className="flex items-center gap-3">
+              {bracket.status !== 'draft' && (
+                <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-sm font-medium">
+                  <button
+                    onClick={() => handleViewModeChange('bracket')}
+                    className={`px-3 py-1.5 transition-colors ${
+                      viewMode === 'bracket'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    Bracket
+                  </button>
+                  <button
+                    onClick={() => handleViewModeChange('list')}
+                    className={`px-3 py-1.5 transition-colors ${
+                      viewMode === 'list'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    List
+                  </button>
+                </div>
+              )}
               {bracket.status === 'draft' && (
                 <button
                   onClick={handleLockBracket}
@@ -401,48 +435,87 @@ export default function BracketIdPage({ params }) {
         )}
       </div>
 
-      {/* Admin Panel — owners only */}
-      {isOwnerOfCurrentBracket && (
-        <div id="admin-panel">
-          <AdminPanel
-            bracket={bracket}
-            matchupGrid={matchupGrid}
-            nameMap={nameMap}
-            publishedRounds={publishedRounds}
-            activeRoundKey={activeRoundKey}
-            ownerPicks={ownerPicks}
-            onWinnerSet={handleSetWinner}
-            onPublishRound={handlePublishRound}
-            onUnlockNames={handleUnlockNames}
-            isOpen={adminPanelOpen}
-            onToggle={() => setAdminPanelOpen(p => !p)}
-          />
-        </div>
-      )}
-
       {/* Bracket */}
       <div className="pb-10">
-        <BracketView
-          matchups={matchupGrid}
-          status={bracket.status}
-          voterId={voterId}
-          voteMap={voteMap}
-          viewerRole={viewerRole}
-          ownerPicks={ownerPicks}
-          lockedRounds={lockedRounds}
-          publishedRounds={publishedRounds}
-          activeRoundKey={activeRoundKey}
-          bracketMatchups={bracket?.matchups || {}}
-          nameMap={nameMap}
-          guestPredictions={guestPredictions}
-          onVoteSuccess={async () => {
-            const fetches = [fetchBracket(), fetchVotedMatchups(voterId)];
-            if (viewerRole === 'owner1' || viewerRole === 'owner2') fetches.push(fetchOwnerPicks());
-            await Promise.all(fetches);
-          }}
-          onGuestLockIn={() => handleGuestLockIn(activeRoundKey)}
-        />
+        {viewMode === 'list' ? (
+          <BracketListView
+            matchups={matchupGrid}
+            status={bracket.status}
+            voterId={voterId}
+            voteMap={voteMap}
+            viewerRole={viewerRole}
+            ownerPicks={ownerPicks}
+            lockedRounds={lockedRounds}
+            publishedRounds={publishedRounds}
+            activeRoundKey={activeRoundKey}
+            bracketMatchups={bracket?.matchups || {}}
+            nameMap={nameMap}
+            onVoteSuccess={async () => {
+              const savedScroll = window.scrollY;
+              const fetches = [fetchBracket(), fetchVotedMatchups(voterId)];
+              if (viewerRole === 'owner1' || viewerRole === 'owner2') fetches.push(fetchOwnerPicks());
+              await Promise.all(fetches);
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  window.scrollTo({ top: savedScroll, behavior: 'instant' });
+                });
+              });
+            }}
+            onGuestLockIn={() => handleGuestLockIn(activeRoundKey)}
+          />
+        ) : (
+          <BracketView
+            matchups={matchupGrid}
+            status={bracket.status}
+            voterId={voterId}
+            voteMap={voteMap}
+            viewerRole={viewerRole}
+            ownerPicks={ownerPicks}
+            lockedRounds={lockedRounds}
+            publishedRounds={publishedRounds}
+            activeRoundKey={activeRoundKey}
+            bracketMatchups={bracket?.matchups || {}}
+            nameMap={nameMap}
+            guestPredictions={guestPredictions}
+            onVoteSuccess={async () => {
+              const savedScroll = window.scrollY;
+              const fetches = [fetchBracket(), fetchVotedMatchups(voterId)];
+              if (viewerRole === 'owner1' || viewerRole === 'owner2') fetches.push(fetchOwnerPicks());
+              await Promise.all(fetches);
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  window.scrollTo({ top: savedScroll, behavior: 'instant' });
+                });
+              });
+            }}
+            onGuestLockIn={() => handleGuestLockIn(activeRoundKey)}
+          />
+        )}
       </div>
+
+      {/* Guest — delete my participation */}
+      {!isOwnerOfCurrentBracket && viewerRole === 'guest' && voterId && (
+        <div className="max-w-7xl mx-auto px-4 pb-6">
+          <button
+            onClick={() => setShowDeleteGuestModal(true)}
+            className="text-sm text-red-500 hover:text-red-700 underline"
+          >
+            Delete my participation
+          </button>
+          {showDeleteGuestModal && (
+            <ConfirmModal
+              title="Delete My Participation"
+              message="This removes all your votes from this bracket. You will no longer be counted as a participant."
+              confirmLabel="Yes, Remove"
+              onConfirm={async () => {
+                await handleDeleteGuestSession();
+                setShowDeleteGuestModal(false);
+              }}
+              onCancel={() => setShowDeleteGuestModal(false)}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }
