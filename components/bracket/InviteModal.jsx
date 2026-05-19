@@ -83,8 +83,9 @@ export default function InviteModal({ bracketId, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-md rounded-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
+      <div className="flex min-h-full items-center justify-center px-4 py-6">
+        <div className="w-full max-w-md rounded-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
@@ -168,6 +169,7 @@ export default function InviteModal({ bracketId, onClose }) {
             )}
           </div>
 
+        </div>
         </div>
       </div>
     </div>
