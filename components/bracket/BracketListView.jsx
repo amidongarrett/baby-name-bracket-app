@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from 'react';
 import ListMatchupCard from './ListMatchupCard';
 
 // Maps API round keys → human-readable labels
@@ -10,6 +11,8 @@ const ROUND_DISPLAY = {
   final4:       'Final 4',
   championship: 'Championship',
 };
+
+const ROUND_ORDER = ['roundOf32', 'roundOf16', 'elite8', 'final4', 'championship'];
 
 export default function BracketListView({
   matchups = [],
@@ -25,7 +28,11 @@ export default function BracketListView({
   nameMap = {},
   onVoteSuccess,
   onGuestLockIn,
+  bracketId,
+  onProceedToNextRound,
 }) {
+  const [proceedLoading, setProceedLoading] = useState(false);
+
   const isLockedIn      = lockedRounds.includes(activeRoundKey);
   const isRoundPublished = publishedRounds.includes(activeRoundKey);
 
@@ -33,6 +40,32 @@ export default function BracketListView({
   const votableMatchups = matchups.filter(m => m.name1Id && m.name2Id);
   const votedCount = votableMatchups.filter(m => voteMap[m._id || m.id]).length;
   const allVoted = votableMatchups.length > 0 && votedCount === votableMatchups.length;
+
+  const nextRoundIndex = ROUND_ORDER.indexOf(activeRoundKey) + 1;
+  const nextRoundKey   = ROUND_ORDER[nextRoundIndex] || null;
+  const nextRoundLabel = nextRoundKey ? ROUND_DISPLAY[nextRoundKey] : null;
+
+  const allMatchupsHaveVotes = votableMatchups.length > 0 &&
+    votableMatchups.every(m => (m.votes?.name1Votes || 0) + (m.votes?.name2Votes || 0) > 0);
+
+  const handleProceedToNextRound = async () => {
+    if (!window.confirm(`Advance to ${nextRoundLabel}? Vote-leaders will be locked in as winners.`)) return;
+    setProceedLoading(true);
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || '';
+      const res = await fetch(`${apiBase}/api/bracket/${bracketId}/proceed-to-next-round`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) throw new Error('Failed to advance round');
+      if (onProceedToNextRound) await onProceedToNextRound();
+    } catch (err) {
+      console.error(err);
+      alert('Could not advance to the next round. Please try again.');
+    } finally {
+      setProceedLoading(false);
+    }
+  };
 
   // Derive champion from bracketMatchups if available
   const championNameId = bracketMatchups.championNameId || null;
@@ -98,6 +131,32 @@ export default function BracketListView({
                   Picks Locked In
                 </span>
               )}
+            </div>
+          )}
+
+          {/* Owner 1 "Proceed to Next Round" CTA */}
+          {status === 'active' && viewerRole === 'owner1' && nextRoundKey && (
+            <div className="mt-4 text-center">
+              {allMatchupsHaveVotes ? (
+                <button
+                  onClick={handleProceedToNextRound}
+                  disabled={proceedLoading}
+                  className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold rounded-lg shadow hover:from-blue-600 hover:to-indigo-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+                >
+                  {proceedLoading ? 'Advancing…' : `Proceed to ${nextRoundLabel}`}
+                </button>
+              ) : (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Waiting for votes…
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Guest "waiting" when locked in but round not yet advanced */}
+          {status === 'active' && viewerRole === 'guest' && isLockedIn && nextRoundKey && (
+            <div className="mt-4 text-center">
+              <p className="text-xs text-gray-500 dark:text-gray-400">Waiting for next round…</p>
             </div>
           )}
         </>

@@ -462,6 +462,8 @@ export default function BracketIdPage({ params }) {
               });
             }}
             onGuestLockIn={() => handleGuestLockIn(activeRoundKey)}
+            bracketId={bracketId}
+            onProceedToNextRound={fetchBracket}
           />
         ) : (
           <BracketView
