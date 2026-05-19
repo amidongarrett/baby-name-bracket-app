@@ -65,7 +65,7 @@ export default function BracketView({
   publishedRounds = [],
   activeRoundKey = 'roundOf32',
   bracketMatchups = {}, nameMap = {},
-  onLockIn
+  onLockIn, onPick,
 }) {
   // Split into owner1 (top 8) and owner2 (bottom 8) matchups.
   // In R32 mode matchupGrid has 16 entries. In later rounds it has fewer
@@ -264,8 +264,10 @@ export default function BracketView({
                         voterId={voterId}
                         viewerRole={viewerRole}
                         ownerPicks={ownerPicks}
-                        isLockedIn={isLocked}
+                        isLocked={isLocked}
                         isRoundPublished={completedR32 ? true : isRoundPublished}
+                        userPickId={userBracket?.picks?.roundOf32?.[index]}
+                        onPick={onPick}
                       />
                     </div>
                   </div>
@@ -323,10 +325,12 @@ export default function BracketView({
                             voterId={voterId}
                             viewerRole={viewerRole}
                             ownerPicks={ownerPicks}
-                            isLockedIn={isLocked}
+                            isLocked={isLocked}
                             isRoundPublished={isR16Published}
                             name1Confirmed={name1Confirmed}
                             name2Confirmed={name2Confirmed}
+                            userPickId={userBracket?.picks?.roundOf16?.[i]}
+                            onPick={onPick}
                           />
                           );
                         })() : (() => {
@@ -403,10 +407,12 @@ export default function BracketView({
                             voterId={voterId}
                             viewerRole={viewerRole}
                             ownerPicks={ownerPicks}
-                            isLockedIn={isLocked}
+                            isLocked={isLocked}
                             isRoundPublished={isE8Published}
                             name1Confirmed={name1Confirmed}
                             name2Confirmed={name2Confirmed}
+                            userPickId={userBracket?.picks?.elite8?.[i]}
+                            onPick={onPick}
                           />
                           );
                         })() : (
@@ -624,10 +630,12 @@ export default function BracketView({
                             voterId={voterId}
                             viewerRole={viewerRole}
                             ownerPicks={ownerPicks}
-                            isLockedIn={isLocked}
+                            isLocked={isLocked}
                             isRoundPublished={isE8Published}
                             name1Confirmed={name1Confirmed}
                             name2Confirmed={name2Confirmed}
+                            userPickId={userBracket?.picks?.elite8?.[2 + i]}
+                            onPick={onPick}
                           />
                           );
                         })() : (
@@ -704,10 +712,12 @@ export default function BracketView({
                             voterId={voterId}
                             viewerRole={viewerRole}
                             ownerPicks={ownerPicks}
-                            isLockedIn={isLocked}
+                            isLocked={isLocked}
                             isRoundPublished={isR16Published}
                             name1Confirmed={name1Confirmed}
                             name2Confirmed={name2Confirmed}
+                            userPickId={userBracket?.picks?.roundOf16?.[4 + i]}
+                            onPick={onPick}
                           />
                           );
                         })() : (() => {
@@ -761,8 +771,10 @@ export default function BracketView({
                         voterId={voterId}
                         viewerRole={viewerRole}
                         ownerPicks={ownerPicks}
-                        isLockedIn={isLocked}
+                        isLocked={isLocked}
                         isRoundPublished={completedR32 ? true : isRoundPublished}
+                        userPickId={userBracket?.picks?.roundOf32?.[index + 8]}
+                        onPick={onPick}
                       />
                     </div>
                   </div>

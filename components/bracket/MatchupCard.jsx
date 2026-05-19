@@ -9,15 +9,15 @@
 
 import { useState } from 'react';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 import NameCard from './NameCard';
 
 export default function MatchupCard({
   matchup, status, index, side = 'left', onClick, voterId,
-  voteMap = {}, viewerRole = 'guest', ownerPicks = {},
-  isLockedIn = false, isRoundPublished = false,
+  viewerRole = 'guest', ownerPicks = {},
+  isLocked = false, isRoundPublished = false,
   slotHeight = 120,
-  onVoteSuccess,
+  onPick,
+  userPickId = null,
   name1Confirmed = true,
   name2Confirmed = true,
   name1FeederWrongPick = null,
@@ -61,12 +61,12 @@ export default function MatchupCard({
 
   const userVotedNameId = isOwner
     ? (viewerRole === 'owner1' ? owner1Pick : owner2Pick)
-    : (voteMap[matchupId] || null);
+    : (userPickId || null);
   // null === null guard: prevents false "Picked" on TBD slots where name IDs are unresolved
   const votedForName1 = name1Id != null && userVotedNameId === name1Id;
   const votedForName2 = name2Id != null && userVotedNameId === name2Id;
 
-  const showVoteBars = status === 'active' && totalVotes > 0 && (isOwner || isLockedIn);
+  const showVoteBars = status === 'active' && totalVotes > 0 && (isOwner || isLocked);
 
   // Guests see winner highlights only after admin publishes the round
   const effectiveWinnerId = (isOwner || isRoundPublished) ? (matchup.winnerId || null) : null;
@@ -90,7 +90,7 @@ export default function MatchupCard({
   // Both name slots must be confirmed before voting is permitted on this card
   const canVote = status === 'active' && !effectiveWinnerId
     && name1Confirmed && name2Confirmed
-    && (isOwner ? true : !isLockedIn);
+    && (isOwner ? true : !isLocked);
   const hasConflict = isOwner && owner1Pick && owner2Pick && owner1Pick !== owner2Pick;
   const dadVotedName1 = owner1Pick === name1Id;
   const dadVotedName2 = owner1Pick === name2Id;
@@ -111,36 +111,24 @@ export default function MatchupCard({
 
   // Handle vote submission
   const handleVote = async (selectedNameId) => {
-    if (!voterId || !matchupId || !selectedNameId || status !== 'active' || isVoting) return;
+    if (!selectedNameId || status !== 'active' || isVoting || !onPick) return;
 
-    // Derive role payload from viewerRole
-    const rolePayload = viewerRole === 'owner1' ? 'Owner 1'
-                      : viewerRole === 'owner2' ? 'Owner 2'
-                      : undefined;
+    // derive camelCase round key from matchup.round
+    const roundKeyMap = {
+      'Round of 32': 'roundOf32',
+      'Round of 16': 'roundOf16',
+      'Elite 8':     'elite8',
+      'Final 4':     'final4',
+      'Championship':'championship',
+    };
+    const roundKey = roundKeyMap[matchup?.round] || null;
+    if (!roundKey) return;
 
     setIsVoting(true);
     try {
-      const body = { voterId, selectedNameId };
-      if (rolePayload) body.role = rolePayload;
-
-      const response = await fetch(`${BASE_URL}/api/votes/${matchupId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to submit vote');
-      }
-
-      // Reload tournament data to show updated vote counts
-      if (onVoteSuccess) {
-        await onVoteSuccess();
-      }
-    } catch (error) {
-      console.error('Vote submission error:', error);
-      alert(`Failed to submit vote: ${error.message}`);
+      await onPick(roundKey, index, selectedNameId);
+    } catch (err) {
+      console.error('Pick error:', err);
     } finally {
       setIsVoting(false);
     }

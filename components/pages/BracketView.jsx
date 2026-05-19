@@ -476,6 +476,7 @@ export default function BracketIdPage({ params }) {
             bracketMatchups={bracket?.matchups || {}}
             nameMap={nameMap}
             onLockIn={handleGuestLockIn}
+            onPick={handlePick}
           />
         )}
       </div>
