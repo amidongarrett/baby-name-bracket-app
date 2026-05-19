@@ -58,23 +58,14 @@ function getFeederLeader(feeder, nameMap, slotBase) {
   }
 }
 
-function getFeederWrongPick(feeder, leader, voteMap, nameMap) {
-  if (!feeder || !leader || !feeder.winnerId) return null;
-  const feederId = feeder.id || feeder._id?.toString();
-  const guestVotedId = voteMap[feederId];
-  if (!guestVotedId || guestVotedId === feeder.winnerId) return null;
-  const guestName = nameMap[guestVotedId]?.value;
-  if (!guestName) return null;
-  return { guestName, actualName: leader.name };
-}
 
 export default function BracketView({
   matchups, status, voterId,
-  voteMap = {}, viewerRole = 'guest', ownerPicks = {},
-  lockedRounds = [], publishedRounds = [],
+  userBracket, viewerRole = 'guest', ownerPicks = {},
+  publishedRounds = [],
   activeRoundKey = 'roundOf32',
-  bracketMatchups = {}, nameMap = {}, guestPredictions = {},
-  onVoteSuccess, onGuestLockIn
+  bracketMatchups = {}, nameMap = {},
+  onLockIn
 }) {
   // Split into owner1 (top 8) and owner2 (bottom 8) matchups.
   // In R32 mode matchupGrid has 16 entries. In later rounds it has fewer
@@ -94,8 +85,8 @@ export default function BracketView({
         name2Id: m.name2Id || null,
         seed1:  idx * 2 + 1,
         seed2:  idx * 2 + 2,
-        votes1: m.votes?.name1Votes ?? 0,
-        votes2: m.votes?.name2Votes ?? 0,
+        votes1: 0,
+        votes2: 0,
         winnerId: m.winnerId || null,
         isPlaceholder1: false,
         isPlaceholder2: false,
@@ -105,7 +96,6 @@ export default function BracketView({
 
   // Top-level owner flag (used when passing to PlaceholderMatchup)
   const isOwner = viewerRole === 'owner1' || viewerRole === 'owner2';
-  const isGuest = !isOwner;
 
   const SLOT_HEIGHT = 130; // px per R32 slot
   const TOTAL_HEIGHT = 8 * SLOT_HEIGHT; // 1040px — shared by ALL round columns
@@ -121,17 +111,15 @@ export default function BracketView({
   const CHAMP_BODY_BOTTOM = TOTAL_HEIGHT / 2 - SLOT_HEIGHT / 2 + F4_LABEL_HEIGHT + CHAMP_SUBTITLE_HEIGHT + F4_CARD_HEIGHT;
 
   // Guest lock-in / publish state — hoisted here so per-round flags aren't recomputed inside loops
-  const isLockedIn      = lockedRounds.includes(activeRoundKey);
+  const picks = userBracket?.picks || { roundOf32: [], roundOf16: [], elite8: [], final4: [], championship: [] };
+  const isLocked        = !!userBracket?.lockedAt;
   const isRoundPublished = publishedRounds.includes(activeRoundKey);
   const isR16Published  = publishedRounds.includes('roundOf16');
-  const isR16Locked     = lockedRounds.includes('roundOf16');
   const isE8Published   = publishedRounds.includes('elite8');
-  const isE8Locked      = lockedRounds.includes('elite8');
 
-  // Count how many current-round matchups the guest has voted on
-  const votableMatchups = matchups.filter(m => m.name1Id && m.name2Id);
-  const votedCount = votableMatchups.filter(m => voteMap[m._id || m.id]).length;
-  const allVoted = votableMatchups.length > 0 && votedCount === votableMatchups.length;
+  // All R32 slots filled = can lock in
+  const allPicksFilled = (picks.roundOf32 || []).every(p => p !== null && p !== undefined);
+  const r32PickCount   = (picks.roundOf32 || []).filter(p => p !== null && p !== undefined).length;
 
   // Refs for each section
   const owner1R1Ref = useRef(null);
@@ -274,12 +262,10 @@ export default function BracketView({
                         side="left"
                         slotHeight={SLOT_HEIGHT}
                         voterId={voterId}
-                        voteMap={voteMap}
                         viewerRole={viewerRole}
                         ownerPicks={ownerPicks}
-                        isLockedIn={isLockedIn}
+                        isLockedIn={isLocked}
                         isRoundPublished={completedR32 ? true : isRoundPublished}
-                        onVoteSuccess={onVoteSuccess}
                       />
                     </div>
                   </div>
@@ -316,8 +302,6 @@ export default function BracketView({
                           const r32Feeders = bracketMatchups.roundOf32 || [];
                           const leader1 = getFeederLeader(r32Feeders[i * 2],     nameMap, i * 2);
                           const leader2 = getFeederLeader(r32Feeders[i * 2 + 1], nameMap, i * 2 + 1);
-                          const name1FWP = isGuest ? getFeederWrongPick(r32Feeders[i * 2],     leader1, voteMap, nameMap) : null;
-                          const name2FWP = isGuest ? getFeederWrongPick(r32Feeders[i * 2 + 1], leader2, voteMap, nameMap) : null;
                           const name1Confirmed = !!leader1;
                           const name2Confirmed = !!leader2;
                           const resolvedMatchup = {
@@ -337,46 +321,33 @@ export default function BracketView({
                             side="left"
                             slotHeight={2 * SLOT_HEIGHT}
                             voterId={voterId}
-                            voteMap={voteMap}
                             viewerRole={viewerRole}
                             ownerPicks={ownerPicks}
-                            isLockedIn={isR16Locked}
+                            isLockedIn={isLocked}
                             isRoundPublished={isR16Published}
-                            onVoteSuccess={onVoteSuccess}
                             name1Confirmed={name1Confirmed}
                             name2Confirmed={name2Confirmed}
-                            name1FeederWrongPick={name1FWP}
-                            name2FeederWrongPick={name2FWP}
                           />
                           );
-                        })() : (
-                          (() => {
-                            const r32 = bracketMatchups.roundOf32 || [];
-                            const vl1 = getFeederLeader(r32[i * 2],     nameMap, i * 2);
-                            const vl2 = getFeederLeader(r32[i * 2 + 1], nameMap, i * 2 + 1);
-                            const basePred = guestPredictions?.roundOf16?.[i] || {};
-                            const syntheticPred = (vl1 || vl2) ? {
-                              ...basePred,
-                              guestName1Id: vl1?.nameId || null,
-                              guestName2Id: vl2?.nameId || null,
-                            } : null;
-                            return (
-                              <PlaceholderMatchup
-                                round={2}
-                                matchup1={matchup1}
-                                matchup2={matchup2}
-                                prediction={syntheticPred}
-                                nameMap={nameMap}
-                                isOwner={isOwner}
-                                status={status}
-                                side="left"
-                                pmIndex={i}
-                                slotHeight={2 * SLOT_HEIGHT}
-                                onClick={() => scrollToRound(owner1R2Ref)}
-                              />
-                            );
-                          })()
-                        )}
+                        })() : (() => {
+                          const name1Id = picks.roundOf32?.[i * 2] || null;
+                          const name2Id = picks.roundOf32?.[i * 2 + 1] || null;
+                          return (
+                            <PlaceholderMatchup
+                              round={2}
+                              matchup1={matchup1}
+                              matchup2={matchup2}
+                              prediction={name1Id || name2Id ? { guestName1Id: name1Id, guestName2Id: name2Id } : null}
+                              nameMap={nameMap}
+                              isOwner={isOwner}
+                              status={status}
+                              side="left"
+                              pmIndex={i}
+                              slotHeight={2 * SLOT_HEIGHT}
+                              onClick={() => scrollToRound(owner1R2Ref)}
+                            />
+                          );
+                        })()}
                       </div>
                     </div>
                   );
@@ -410,8 +381,6 @@ export default function BracketView({
                           const r16Feeders = bracketMatchups.roundOf16 || [];
                           const leader1 = getFeederLeader(r16Feeders[i * 2],     nameMap, i * 2);
                           const leader2 = getFeederLeader(r16Feeders[i * 2 + 1], nameMap, i * 2 + 1);
-                          const name1FWP = isGuest ? getFeederWrongPick(r16Feeders[i * 2],     leader1, voteMap, nameMap) : null;
-                          const name2FWP = isGuest ? getFeederWrongPick(r16Feeders[i * 2 + 1], leader2, voteMap, nameMap) : null;
                           const name1Confirmed = !!leader1;
                           const name2Confirmed = !!leader2;
                           const resolvedMatchup = {
@@ -432,16 +401,12 @@ export default function BracketView({
                             round={3}
                             slotHeight={4 * SLOT_HEIGHT}
                             voterId={voterId}
-                            voteMap={voteMap}
                             viewerRole={viewerRole}
                             ownerPicks={ownerPicks}
-                            isLockedIn={isE8Locked}
+                            isLockedIn={isLocked}
                             isRoundPublished={isE8Published}
-                            onVoteSuccess={onVoteSuccess}
                             name1Confirmed={name1Confirmed}
                             name2Confirmed={name2Confirmed}
-                            name1FeederWrongPick={name1FWP}
-                            name2FeederWrongPick={name2FWP}
                           />
                           );
                         })() : (
@@ -451,7 +416,7 @@ export default function BracketView({
                             matchup2={owner1Matchups[matchup1Index + 1]}
                             matchup3={owner1Matchups[matchup2Index]}
                             matchup4={owner1Matchups[matchup2Index + 1]}
-                            prediction={guestPredictions?.elite8?.[i] || null}
+                            prediction={null}
                             nameMap={nameMap}
                             isOwner={isOwner}
                             status={status}
@@ -497,7 +462,7 @@ export default function BracketView({
                     matchup2={owner1Matchups[1]}
                     matchup3={owner1Matchups[2]}
                     matchup4={owner1Matchups[3]}
-                    prediction={guestPredictions?.final4?.[0] || null}
+                    prediction={null}
                     nameMap={nameMap}
                     isOwner={isOwner}
                     status={status}
@@ -525,7 +490,7 @@ export default function BracketView({
                   <div className="text-xs font-semibold text-yellow-600 mb-1 text-center">CHAMPIONSHIP</div>
                   <PlaceholderMatchup
                     round={5}
-                    prediction={guestPredictions?.championship?.[0] || null}
+                    prediction={null}
                     nameMap={nameMap}
                     isOwner={isOwner}
                     status={status}
@@ -547,26 +512,26 @@ export default function BracketView({
                       width: '160px',
                     }}
                   >
-                    {!isLockedIn && (
+                    {!isLocked && (
                       <>
                         <p className="text-xs text-gray-500 mb-2">
-                          {allVoted
-                            ? 'All picks made! Lock in to see how others voted.'
-                            : `${votedCount} / ${votableMatchups.length} matchups picked`}
+                          {allPicksFilled
+                            ? 'All picks made! Lock in your bracket.'
+                            : `${r32PickCount} / 16 picks made`}
                         </p>
                         <button
-                          onClick={onGuestLockIn}
-                          disabled={!allVoted}
+                          onClick={onLockIn}
+                          disabled={!allPicksFilled}
                           className="px-6 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-lg shadow hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-sm"
                         >
-                          Lock In My Picks
+                          Lock In My Bracket
                         </button>
                       </>
                     )}
-                    {isLockedIn && (
+                    {isLocked && (
                       <div className="pt-4">
                         <span className="px-4 py-2 text-sm font-semibold text-green-700 bg-green-100 rounded-lg border border-green-300">
-                          Picks Locked In
+                          Bracket Locked In
                         </span>
                       </div>
                     )}
@@ -594,7 +559,7 @@ export default function BracketView({
                     matchup2={owner2Matchups[1]}
                     matchup3={owner2Matchups[2]}
                     matchup4={owner2Matchups[3]}
-                    prediction={guestPredictions?.final4?.[1] || null}
+                    prediction={null}
                     nameMap={nameMap}
                     isOwner={isOwner}
                     status={status}
@@ -637,8 +602,6 @@ export default function BracketView({
                           const globalR16Base = 4 + i * 2;
                           const leader1 = getFeederLeader(r16Feeders[globalR16Base],     nameMap, globalR16Base);
                           const leader2 = getFeederLeader(r16Feeders[globalR16Base + 1], nameMap, globalR16Base + 1);
-                          const name1FWP = isGuest ? getFeederWrongPick(r16Feeders[globalR16Base],     leader1, voteMap, nameMap) : null;
-                          const name2FWP = isGuest ? getFeederWrongPick(r16Feeders[globalR16Base + 1], leader2, voteMap, nameMap) : null;
                           const name1Confirmed = !!leader1;
                           const name2Confirmed = !!leader2;
                           const resolvedMatchup = {
@@ -659,16 +622,12 @@ export default function BracketView({
                             round={3}
                             slotHeight={4 * SLOT_HEIGHT}
                             voterId={voterId}
-                            voteMap={voteMap}
                             viewerRole={viewerRole}
                             ownerPicks={ownerPicks}
-                            isLockedIn={isE8Locked}
+                            isLockedIn={isLocked}
                             isRoundPublished={isE8Published}
-                            onVoteSuccess={onVoteSuccess}
                             name1Confirmed={name1Confirmed}
                             name2Confirmed={name2Confirmed}
-                            name1FeederWrongPick={name1FWP}
-                            name2FeederWrongPick={name2FWP}
                           />
                           );
                         })() : (
@@ -678,7 +637,7 @@ export default function BracketView({
                             matchup2={owner2Matchups[matchup1Index + 1]}
                             matchup3={owner2Matchups[matchup2Index]}
                             matchup4={owner2Matchups[matchup2Index + 1]}
-                            prediction={guestPredictions?.elite8?.[2 + i] || null}
+                            prediction={null}
                             nameMap={nameMap}
                             isOwner={isOwner}
                             status={status}
@@ -724,8 +683,6 @@ export default function BracketView({
                           const globalIdx = 4 + i;
                           const leader1 = getFeederLeader(r32Feeders[globalIdx * 2],     nameMap, globalIdx * 2);
                           const leader2 = getFeederLeader(r32Feeders[globalIdx * 2 + 1], nameMap, globalIdx * 2 + 1);
-                          const name1FWP = isGuest ? getFeederWrongPick(r32Feeders[globalIdx * 2],     leader1, voteMap, nameMap) : null;
-                          const name2FWP = isGuest ? getFeederWrongPick(r32Feeders[globalIdx * 2 + 1], leader2, voteMap, nameMap) : null;
                           const name1Confirmed = !!leader1;
                           const name2Confirmed = !!leader2;
                           const resolvedMatchup = {
@@ -745,46 +702,33 @@ export default function BracketView({
                             side="right"
                             slotHeight={2 * SLOT_HEIGHT}
                             voterId={voterId}
-                            voteMap={voteMap}
                             viewerRole={viewerRole}
                             ownerPicks={ownerPicks}
-                            isLockedIn={isR16Locked}
+                            isLockedIn={isLocked}
                             isRoundPublished={isR16Published}
-                            onVoteSuccess={onVoteSuccess}
                             name1Confirmed={name1Confirmed}
                             name2Confirmed={name2Confirmed}
-                            name1FeederWrongPick={name1FWP}
-                            name2FeederWrongPick={name2FWP}
                           />
                           );
-                        })() : (
-                          (() => {
-                            const r32 = bracketMatchups.roundOf32 || [];
-                            const vl1 = getFeederLeader(r32[(4 + i) * 2],     nameMap, (4 + i) * 2);
-                            const vl2 = getFeederLeader(r32[(4 + i) * 2 + 1], nameMap, (4 + i) * 2 + 1);
-                            const basePred = guestPredictions?.roundOf16?.[4 + i] || {};
-                            const syntheticPred = (vl1 || vl2) ? {
-                              ...basePred,
-                              guestName1Id: vl1?.nameId || null,
-                              guestName2Id: vl2?.nameId || null,
-                            } : null;
-                            return (
-                              <PlaceholderMatchup
-                                round={2}
-                                matchup1={matchup1}
-                                matchup2={matchup2}
-                                prediction={syntheticPred}
-                                nameMap={nameMap}
-                                isOwner={isOwner}
-                                status={status}
-                                side="right"
-                                pmIndex={i}
-                                slotHeight={2 * SLOT_HEIGHT}
-                                onClick={() => scrollToRound(owner2R2Ref)}
-                              />
-                            );
-                          })()
-                        )}
+                        })() : (() => {
+                          const name1Id = picks.roundOf32?.[(4 + i) * 2] || null;
+                          const name2Id = picks.roundOf32?.[(4 + i) * 2 + 1] || null;
+                          return (
+                            <PlaceholderMatchup
+                              round={2}
+                              matchup1={matchup1}
+                              matchup2={matchup2}
+                              prediction={name1Id || name2Id ? { guestName1Id: name1Id, guestName2Id: name2Id } : null}
+                              nameMap={nameMap}
+                              isOwner={isOwner}
+                              status={status}
+                              side="right"
+                              pmIndex={i}
+                              slotHeight={2 * SLOT_HEIGHT}
+                              onClick={() => scrollToRound(owner2R2Ref)}
+                            />
+                          );
+                        })()}
                       </div>
                     </div>
                   );
@@ -815,12 +759,10 @@ export default function BracketView({
                         side="right"
                         slotHeight={SLOT_HEIGHT}
                         voterId={voterId}
-                        voteMap={voteMap}
                         viewerRole={viewerRole}
                         ownerPicks={ownerPicks}
-                        isLockedIn={isLockedIn}
+                        isLockedIn={isLocked}
                         isRoundPublished={completedR32 ? true : isRoundPublished}
-                        onVoteSuccess={onVoteSuccess}
                       />
                     </div>
                   </div>

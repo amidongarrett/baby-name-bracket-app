@@ -6,9 +6,11 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function ListMatchupCard({
   matchup, status, index, voterId,
-  voteMap = {}, viewerRole = 'guest', ownerPicks = {},
-  isLockedIn = false, isRoundPublished = false,
-  onVoteSuccess
+  userPickId = null, isLocked = false,
+  viewerRole = 'guest', ownerPicks = {},
+  isRoundPublished = false,
+  activeRoundKey = 'roundOf32',
+  onPick
 }) {
   const [isVoting, setIsVoting] = useState(false);
 
@@ -40,12 +42,12 @@ export default function ListMatchupCard({
 
   const userVotedNameId = isOwner
     ? (viewerRole === 'owner1' ? owner1Pick : owner2Pick)
-    : (voteMap[matchupId] || null);
+    : (userPickId || null);
   // null === null guard: prevents false "Picked" on TBD slots where name IDs are unresolved
   const votedForName1 = name1Id != null && userVotedNameId === name1Id;
   const votedForName2 = name2Id != null && userVotedNameId === name2Id;
 
-  const showVoteBars = status === 'active' && totalVotes > 0 && (isOwner || isLockedIn);
+  const showVoteBars = isOwner && status === 'active' && totalVotes > 0;
 
   // Guests see winner highlights only after admin publishes the round
   const effectiveWinnerId = (isOwner || isRoundPublished) ? (matchup.winnerId || null) : null;
@@ -63,7 +65,7 @@ export default function ListMatchupCard({
 
   // Owners can always re-vote (to resolve conflicts) until winner is set; guests until lock-in
   const canVote = status === 'active' && !effectiveWinnerId && (
-    isOwner ? true : !isLockedIn
+    isOwner ? true : !isLocked
   );
   const hasConflict = isOwner && owner1Pick && owner2Pick && owner1Pick !== owner2Pick;
   const dadVotedName1 = owner1Pick === name1Id;
@@ -71,36 +73,32 @@ export default function ListMatchupCard({
   const momVotedName1 = owner2Pick === name1Id;
   const momVotedName2 = owner2Pick === name2Id;
 
-  // Handle vote submission
+  // Handle pick submission (guest) or owner vote
   const handleVote = async (selectedNameId) => {
-    if (!voterId || !matchupId || !selectedNameId || status !== 'active' || isVoting) return;
-
-    const rolePayload = viewerRole === 'owner1' ? 'Owner 1'
-                      : viewerRole === 'owner2' ? 'Owner 2'
-                      : undefined;
+    if (!selectedNameId || status !== 'active' || isVoting) return;
+    if (!isOwner && isLocked) return;
+    if (!isOwner && !onPick) return;
 
     setIsVoting(true);
     try {
-      const body = { voterId, selectedNameId };
-      if (rolePayload) body.role = rolePayload;
-
-      const response = await fetch(`${BASE_URL}/api/votes/${matchupId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to submit vote');
-      }
-
-      if (onVoteSuccess) {
-        await onVoteSuccess();
+      if (isOwner) {
+        // Owner picks go through the legacy owner-picks endpoint
+        const rolePayload = viewerRole === 'owner1' ? 'Owner 1' : 'Owner 2';
+        const response = await fetch(`${BASE_URL}/api/votes/${matchupId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ voterId, selectedNameId, role: rolePayload }),
+        });
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to submit vote');
+        }
+      } else {
+        await onPick(activeRoundKey, index, selectedNameId);
       }
     } catch (error) {
-      console.error('Vote submission error:', error);
-      alert(`Failed to submit vote: ${error.message}`);
+      console.error('Pick submission error:', error);
+      alert(`Failed to submit pick: ${error.message}`);
     } finally {
       setIsVoting(false);
     }

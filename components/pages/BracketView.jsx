@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect, useMemo, use } from 'react';
+import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import BracketView from '@/components/bracket/BracketView';
 import BracketListView from '@/components/bracket/BracketListView';
 import { advanceTournamentRound } from '@/utils/api';
-import { computeGuestPredictions } from '@/utils/guestBracket';
 import { useUser } from '@/contexts/UserContext';
 import { useBracket } from '@/contexts/BracketContext';
 import ConfirmModal from '@/components/ui/ConfirmModal';
@@ -37,9 +36,8 @@ export default function BracketIdPage({ params }) {
   const [error, setError] = useState(null);
   const [voterId, setVoterId] = useState(null);
   const [previewMatchups, setPreviewMatchups] = useState([]);
-  const [voteMap, setVoteMap] = useState({}); // { [matchupId]: selectedNameId }
+  const [userBracket, setUserBracket] = useState(null);
   const [ownerPicks, setOwnerPicks] = useState({}); // { [matchupId]: { owner1NameId, owner2NameId } }
-  const [lockedRounds, setLockedRounds] = useState([]);     // rounds this guest has locked in
   const [publishedRounds, setPublishedRounds] = useState([]); // rounds admin has published
   const [showDeleteGuestModal, setShowDeleteGuestModal] = useState(false);
   const [viewMode, setViewMode] = useState(() => {
@@ -68,15 +66,14 @@ export default function BracketIdPage({ params }) {
     }
   }, []);
 
-  // Fetch which matchups this voter has already voted in
-  const fetchVotedMatchups = async (id) => {
+  // Fetch this voter's UserBracket document
+  const fetchUserBracket = async (id) => {
     if (!id) return;
     try {
-      const res = await fetch(`${BASE_URL}/api/votes/user/${id}`);
+      const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}/my-bracket?userId=${id}`);
       if (res.ok) {
         const data = await res.json();
-        setVoteMap(data.voteMap || {});
-        setLockedRounds(data.lockedRounds || []);
+        setUserBracket(data);
       }
     } catch {}
   };
@@ -93,7 +90,7 @@ export default function BracketIdPage({ params }) {
   };
 
   useEffect(() => {
-    if (voterId) fetchVotedMatchups(voterId);
+    if (voterId) fetchUserBracket(voterId);
   }, [voterId]);
 
   // Fetch owner picks on role change or bracket status change (all roles — guests need
@@ -187,16 +184,34 @@ export default function BracketIdPage({ params }) {
     }
   };
 
-  const handleGuestLockIn = async (round) => {
+  const handlePick = async (round, position, selectedNameId) => {
+    const savedScroll = window.scrollY;
     try {
-      const res = await fetch(`${BASE_URL}/api/bracket/guest-lock-in`, {
+      const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}/my-bracket/pick`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voterId, round, bracketId }),
+        body: JSON.stringify({ userId: voterId, round, position, selectedNameId }),
+      });
+      if (res.ok) {
+        setUserBracket(await res.json());
+        await fetchBracket();
+      }
+    } catch (err) { console.error(err); }
+    requestAnimationFrame(() => requestAnimationFrame(() =>
+      window.scrollTo({ top: savedScroll, behavior: 'instant' })
+    ));
+  };
+
+  const handleGuestLockIn = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}/my-bracket/lock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: voterId }),
       });
       if (res.ok) {
         const data = await res.json();
-        setLockedRounds(data.lockedRounds || []);
+        setUserBracket(data);
       }
     } catch {}
   };
@@ -209,8 +224,7 @@ export default function BracketIdPage({ params }) {
         body: JSON.stringify({ guestId: voterId }),
       });
       if (!res.ok) throw new Error('Failed to remove guest session');
-      setVoteMap({});
-      setLockedRounds([]);
+      setUserBracket(null);
       localStorage.removeItem('voterId');
       setVoterId(null);
     } catch (err) {
@@ -238,11 +252,6 @@ export default function BracketIdPage({ params }) {
   useEffect(() => {
     if (bracket?.status === 'draft') fetchPreviewMatchups();
   }, [bracket?.status, bracket?.totalNames]);
-
-  const guestPredictions = useMemo(() =>
-    computeGuestPredictions(bracket?.matchups, voteMap, publishedRounds),
-    [bracket?.matchups, voteMap, publishedRounds]
-  );
 
   if (loading) {
     return (
@@ -442,26 +451,15 @@ export default function BracketIdPage({ params }) {
             matchups={matchupGrid}
             status={bracket.status}
             voterId={voterId}
-            voteMap={voteMap}
+            userBracket={userBracket}
             viewerRole={viewerRole}
             ownerPicks={ownerPicks}
-            lockedRounds={lockedRounds}
             publishedRounds={publishedRounds}
             activeRoundKey={activeRoundKey}
             bracketMatchups={bracket?.matchups || {}}
             nameMap={nameMap}
-            onVoteSuccess={async () => {
-              const savedScroll = window.scrollY;
-              const fetches = [fetchBracket(), fetchVotedMatchups(voterId)];
-              if (viewerRole === 'owner1' || viewerRole === 'owner2') fetches.push(fetchOwnerPicks());
-              await Promise.all(fetches);
-              requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                  window.scrollTo({ top: savedScroll, behavior: 'instant' });
-                });
-              });
-            }}
-            onGuestLockIn={() => handleGuestLockIn(activeRoundKey)}
+            onPick={handlePick}
+            onLockIn={handleGuestLockIn}
             bracketId={bracketId}
             onProceedToNextRound={fetchBracket}
           />
@@ -470,27 +468,14 @@ export default function BracketIdPage({ params }) {
             matchups={matchupGrid}
             status={bracket.status}
             voterId={voterId}
-            voteMap={voteMap}
+            userBracket={userBracket}
             viewerRole={viewerRole}
             ownerPicks={ownerPicks}
-            lockedRounds={lockedRounds}
             publishedRounds={publishedRounds}
             activeRoundKey={activeRoundKey}
             bracketMatchups={bracket?.matchups || {}}
             nameMap={nameMap}
-            guestPredictions={guestPredictions}
-            onVoteSuccess={async () => {
-              const savedScroll = window.scrollY;
-              const fetches = [fetchBracket(), fetchVotedMatchups(voterId)];
-              if (viewerRole === 'owner1' || viewerRole === 'owner2') fetches.push(fetchOwnerPicks());
-              await Promise.all(fetches);
-              requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                  window.scrollTo({ top: savedScroll, behavior: 'instant' });
-                });
-              });
-            }}
-            onGuestLockIn={() => handleGuestLockIn(activeRoundKey)}
+            onLockIn={handleGuestLockIn}
           />
         )}
       </div>

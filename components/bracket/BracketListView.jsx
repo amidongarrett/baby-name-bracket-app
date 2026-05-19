@@ -18,35 +18,40 @@ export default function BracketListView({
   matchups = [],
   status,
   voterId,
-  voteMap = {},
+  userBracket,
   viewerRole = 'guest',
   ownerPicks = {},
-  lockedRounds = [],
   publishedRounds = [],
   activeRoundKey = 'roundOf32',
   bracketMatchups = {},
   nameMap = {},
-  onVoteSuccess,
-  onGuestLockIn,
+  onPick,
+  onLockIn,
   bracketId,
   onProceedToNextRound,
 }) {
   const [proceedLoading, setProceedLoading] = useState(false);
 
-  const isLockedIn      = lockedRounds.includes(activeRoundKey);
+  const picks = userBracket?.picks || { roundOf32: [], roundOf16: [], elite8: [], final4: [], championship: [] };
+  const isLocked = !!userBracket?.lockedAt;
   const isRoundPublished = publishedRounds.includes(activeRoundKey);
 
-  // Count how many current-round matchups the viewer has voted on
+  // Derive voted count from userBracket picks for the active round
+  const currentRoundPicks = picks[activeRoundKey] || [];
+  const allVoted = currentRoundPicks.length > 0 && currentRoundPicks.every(p => p !== null && p !== undefined);
+  const votedCount = currentRoundPicks.filter(p => p !== null && p !== undefined).length;
+
+  // All R32 slots filled = can lock in
+  const allPicksFilled = (picks.roundOf32 || []).every(p => p !== null && p !== undefined);
+
   const votableMatchups = matchups.filter(m => m.name1Id && m.name2Id);
-  const votedCount = votableMatchups.filter(m => voteMap[m._id || m.id]).length;
-  const allVoted = votableMatchups.length > 0 && votedCount === votableMatchups.length;
 
   const nextRoundIndex = ROUND_ORDER.indexOf(activeRoundKey) + 1;
   const nextRoundKey   = ROUND_ORDER[nextRoundIndex] || null;
   const nextRoundLabel = nextRoundKey ? ROUND_DISPLAY[nextRoundKey] : null;
 
-  const allMatchupsHaveVotes = votableMatchups.length > 0 &&
-    votableMatchups.every(m => (m.votes?.name1Votes || 0) + (m.votes?.name2Votes || 0) > 0);
+  const allMatchupsHaveWinners = votableMatchups.length > 0 &&
+    votableMatchups.every(m => !!m.winnerId);
 
   const handleProceedToNextRound = async () => {
     if (!window.confirm(`Advance to ${nextRoundLabel}? Vote-leaders will be locked in as winners.`)) return;
@@ -98,37 +103,38 @@ export default function BracketListView({
               status={status}
               index={index}
               voterId={voterId}
-              voteMap={voteMap}
+              userPickId={currentRoundPicks[index] || null}
+              isLocked={isLocked}
               viewerRole={viewerRole}
               ownerPicks={ownerPicks}
-              isLockedIn={isLockedIn}
               isRoundPublished={isRoundPublished}
-              onVoteSuccess={onVoteSuccess}
+              activeRoundKey={activeRoundKey}
+              onPick={onPick}
             />
           ))}
 
           {/* Guest lock-in CTA */}
           {status === 'active' && viewerRole === 'guest' && (
             <div className="mt-4 text-center">
-              {!isLockedIn && (
+              {!isLocked && (
                 <>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                    {allVoted
-                      ? 'All picks made! Lock in to see how others voted.'
-                      : `${votedCount} / ${votableMatchups.length} matchups picked`}
+                    {allPicksFilled
+                      ? 'All picks made! Lock in your bracket.'
+                      : `${(picks.roundOf32 || []).filter(p => p !== null && p !== undefined).length} / 16 Round of 32 picks made`}
                   </p>
                   <button
-                    onClick={onGuestLockIn}
-                    disabled={!allVoted}
+                    onClick={onLockIn}
+                    disabled={!allPicksFilled}
                     className="px-6 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-lg shadow hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-sm"
                   >
-                    Lock In My Picks
+                    Lock In My Bracket
                   </button>
                 </>
               )}
-              {isLockedIn && (
+              {isLocked && (
                 <span className="px-4 py-2 text-sm font-semibold text-green-700 bg-green-100 dark:bg-green-900/40 dark:text-green-400 rounded-lg border border-green-300 dark:border-green-700">
-                  Picks Locked In
+                  Bracket Locked In
                 </span>
               )}
             </div>
@@ -137,7 +143,7 @@ export default function BracketListView({
           {/* Owner 1 "Proceed to Next Round" CTA */}
           {status === 'active' && viewerRole === 'owner1' && nextRoundKey && (
             <div className="mt-4 text-center">
-              {allMatchupsHaveVotes ? (
+              {allMatchupsHaveWinners ? (
                 <button
                   onClick={handleProceedToNextRound}
                   disabled={proceedLoading}
@@ -147,14 +153,14 @@ export default function BracketListView({
                 </button>
               ) : (
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Waiting for votes…
+                  Waiting for winners to be set…
                 </p>
               )}
             </div>
           )}
 
           {/* Guest "waiting" when locked in but round not yet advanced */}
-          {status === 'active' && viewerRole === 'guest' && isLockedIn && nextRoundKey && (
+          {status === 'active' && viewerRole === 'guest' && isLocked && nextRoundKey && (
             <div className="mt-4 text-center">
               <p className="text-xs text-gray-500 dark:text-gray-400">Waiting for next round…</p>
             </div>
