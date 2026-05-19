@@ -21,6 +21,7 @@ export default function MatchupCard({
   name1FeederWrongPick = null,
   name2FeederWrongPick = null,
   connectorSide = null,
+  round = null,
 }) {
   const [isVoting, setIsVoting] = useState(false);
 
@@ -226,8 +227,10 @@ export default function MatchupCard({
         />
       </div>
 
-      {/* Vertical connector for paired matchups */}
-      {index % 2 === 0 && (
+      {/* Vertical L-shape connector that bracket-pairs adjacent matchups into the next round.
+          Suppressed for Elite 8 (round === 3) because each E8 card feeds a different
+          Final 4 cell rather than pairing with the other E8 card on its side. */}
+      {round !== 3 && index % 2 === 0 && (
         <div className={`absolute ${connectorPos} top-1/2 hidden xl:block`}>
           <div
             className={`w-8 ${connectorBorder} border-t-2 border-gray-300`}
@@ -235,7 +238,7 @@ export default function MatchupCard({
           />
         </div>
       )}
-      {index % 2 === 1 && (
+      {round !== 3 && index % 2 === 1 && (
         <div className={`absolute ${connectorPos} bottom-1/2 hidden xl:block`}>
           <div
             className={`w-8 ${connectorBorder} border-b-2 border-gray-300`}

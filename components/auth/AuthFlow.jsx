@@ -64,9 +64,14 @@ export default function AuthFlow({ onComplete }) {
   async function handleNameSubmit(e) {
     e.preventDefault();
     setError('');
+    if (!displayName.trim()) {
+      setError('Display name is required.');
+      return;
+    }
     setSubmitting(true);
     try {
-      await setName(displayName.trim(), pendingToken || token);
+      const { user: updatedUser } = await setName(displayName.trim(), pendingToken || token);
+      login(pendingToken || token, updatedUser);
       onComplete();
     } catch (err) {
       setError(err.message);

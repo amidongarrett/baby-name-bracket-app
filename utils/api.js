@@ -1,3 +1,5 @@
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 /**
  * Lock the tournament bracket to prevent further modifications
  * @returns {Promise<Object>} The parsed JSON response from the API
@@ -5,7 +7,7 @@
  */
 export async function lockTournamentBracket() {
   try {
-    const response = await fetch('http://localhost:3001/api/bracket/lock', {
+    const response = await fetch(`${BASE_URL}/api/bracket/lock`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -36,7 +38,7 @@ export async function lockTournamentBracket() {
  */
 export async function advanceTournamentRound(round, bracketId) {
   try {
-    const response = await fetch('http://localhost:3001/api/bracket/advance', {
+    const response = await fetch(`${BASE_URL}/api/bracket/advance`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

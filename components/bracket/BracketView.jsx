@@ -411,6 +411,7 @@ export default function BracketView({
                             status={status}
                             index={i}
                             side="left"
+                            round={3}
                             slotHeight={4 * SLOT_HEIGHT}
                             voterId={voterId}
                             voteMap={voteMap}
@@ -516,18 +517,20 @@ export default function BracketView({
                   />
                 </div>
 
-                {/* Lock-in block — positioned to the right of the Championship card */}
+                {/* Lock-in block — positioned to the right of the Championship card so the
+                    Championship → Division 2 connector stays clean. Vertically aligned with the
+                    top of the Championship card body. */}
                 {status === 'active' && viewerRole === 'guest' && (
                   <div
-                    className="absolute"
+                    className="absolute text-center"
                     style={{
-                      top:  `${TOTAL_HEIGHT / 2 - SLOT_HEIGHT / 2}px`,
+                      top:  `${TOTAL_HEIGHT / 2 - SLOT_HEIGHT / 2 + F4_LABEL_HEIGHT + CHAMP_SUBTITLE_HEIGHT}px`,
                       left: 'calc(100% + 8px)',
                       width: '160px',
                     }}
                   >
                     {!isLockedIn && (
-                      <div className="text-center">
+                      <>
                         <p className="text-xs text-gray-500 mb-2">
                           {allVoted
                             ? 'All picks made! Lock in to see how others voted.'
@@ -540,10 +543,10 @@ export default function BracketView({
                         >
                           Lock In My Picks
                         </button>
-                      </div>
+                      </>
                     )}
                     {isLockedIn && (
-                      <div className="text-center pt-4">
+                      <div className="pt-4">
                         <span className="px-4 py-2 text-sm font-semibold text-green-700 bg-green-100 rounded-lg border border-green-300">
                           Picks Locked In
                         </span>
@@ -635,7 +638,7 @@ export default function BracketView({
                             status={status}
                             index={2 + i}
                             side="right"
-                            connectorSide="left"
+                            round={3}
                             slotHeight={4 * SLOT_HEIGHT}
                             voterId={voterId}
                             voteMap={voteMap}
@@ -987,13 +990,15 @@ function PlaceholderMatchup({
 
   return (
     <div className="relative">
-      {round < 4 && (
+      {round < 4 && !isFinal4 && !isChampionship && (
         <>
           {/*
             Horizontal stub pointing to the next round.
+            - round 1 (R32→S16): only a stub, no L-shape — render always.
             - round 2 (S16→E8): suppressed here because the L-shape below already draws
               the horizontal segment via border-t-2/border-b-2, preventing double-bold lines.
-            - round 3 (E8→F4): rendered; no L-shape is drawn for this round.
+            - round 3 (E8→F4): rendered as a straight horizontal stub; no L-shape for this round
+              because each Elite 8 card feeds a different Final 4 cell independently.
           */}
           {round !== 2 && (
             <div className={`absolute ${connectorPos} top-1/2 w-8 h-0.5 bg-gray-300 hidden xl:block`} />

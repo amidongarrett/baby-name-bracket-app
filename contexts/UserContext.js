@@ -86,6 +86,11 @@ export function UserProvider({ children }) {
     setUser(newUser);
   }
 
+  /** Pushes updated user data into context after a successful profile save. */
+  function updateUser(newUser) {
+    setUser(newUser);
+  }
+
   /** Clears auth state and returns the user to the sign-in screen. */
   function logout() {
     localStorage.removeItem('authToken');
@@ -112,6 +117,7 @@ export function UserProvider({ children }) {
     user,
     login,
     logout,
+    updateUser,
     authLoading,
 
     // Core identity
