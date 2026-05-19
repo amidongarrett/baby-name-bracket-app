@@ -194,7 +194,7 @@ export default function BracketIdPage({ params }) {
       });
       if (res.ok) {
         setUserBracket(await res.json());
-        await fetchBracket();
+        await fetchUserBracket(voterId);
       }
     } catch (err) { console.error(err); }
     requestAnimationFrame(() => requestAnimationFrame(() =>
