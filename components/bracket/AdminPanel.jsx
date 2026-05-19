@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 export default function AdminPanel({
   bracket,
   matchupGrid,
@@ -198,7 +200,7 @@ export default function AdminPanel({
               <button
                 onClick={async () => {
                   if (!window.confirm('Reset and regenerate the bracket? This will delete all votes.')) return;
-                  await fetch('http://localhost:3001/api/admin/reset-and-regenerate', { method: 'POST' });
+                  await fetch(`${BASE_URL}/api/admin/reset-and-regenerate`, { method: 'POST' });
                   window.location.reload();
                 }}
                 className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 transition-colors"
@@ -234,7 +236,7 @@ export default function AdminPanel({
                           <button
                             onClick={async () => {
                               setShowUnlockModal(false);
-                              await fetch('http://localhost:3001/api/admin/unlock-names', { method: 'POST' });
+                              await fetch(`${BASE_URL}/api/admin/unlock-names`, { method: 'POST' });
                               onUnlockNames();
                             }}
                             className="px-4 py-2 text-sm font-bold rounded bg-red-600 text-white hover:bg-red-700"

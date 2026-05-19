@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 export default function NameGenerator({ onGenerate }) {
   const [selectedGender, setSelectedGender] = useState('neutral');
   const [namePool, setNamePool] = useState({ girl: [], boy: [], neutral: [] });
@@ -17,9 +19,9 @@ export default function NameGenerator({ onGenerate }) {
     const fetchAllPools = async () => {
       try {
         const [girlRes, boyRes, neutralRes] = await Promise.all([
-          fetch('http://localhost:3001/api/baby-names?gender=girl'),
-          fetch('http://localhost:3001/api/baby-names?gender=boy'),
-          fetch('http://localhost:3001/api/baby-names?gender=neutral'),
+          fetch(`${BASE_URL}/api/baby-names?gender=girl`),
+          fetch(`${BASE_URL}/api/baby-names?gender=boy`),
+          fetch(`${BASE_URL}/api/baby-names?gender=neutral`),
         ]);
 
         const [girlData, boyData, neutralData] = await Promise.all([

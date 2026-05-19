@@ -9,6 +9,8 @@ import { computeGuestPredictions } from '@/utils/guestBracket';
 import { useUser } from '@/contexts/UserContext';
 import { useBracket } from '@/contexts/BracketContext';
 
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 const generateVoterId = () =>
   'voter_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
 
@@ -55,7 +57,7 @@ export default function BracketIdPage({ params }) {
   const fetchVotedMatchups = async (id) => {
     if (!id) return;
     try {
-      const res = await fetch(`http://localhost:3001/api/votes/user/${id}`);
+      const res = await fetch(`${BASE_URL}/api/votes/user/${id}`);
       if (res.ok) {
         const data = await res.json();
         setVoteMap(data.voteMap || {});
@@ -67,7 +69,7 @@ export default function BracketIdPage({ params }) {
   // Fetch owner picks (only called for owner viewers)
   const fetchOwnerPicks = async () => {
     try {
-      const res = await fetch(`http://localhost:3001/api/bracket/owner-picks?bracketId=${bracketId}`);
+      const res = await fetch(`${BASE_URL}/api/bracket/owner-picks?bracketId=${bracketId}`);
       if (res.ok) {
         const data = await res.json();
         setOwnerPicks(data.ownerPicks || {});
@@ -88,7 +90,7 @@ export default function BracketIdPage({ params }) {
   const fetchBracket = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3001/api/bracket/${bracketId}`);
+      const response = await fetch(`${BASE_URL}/api/bracket/${bracketId}`);
       if (!response.ok) throw new Error('Failed to fetch bracket');
       const data = await response.json();
       setBracket(data);
@@ -141,7 +143,7 @@ export default function BracketIdPage({ params }) {
 
   const fetchPreviewMatchups = async () => {
     try {
-      const response = await fetch(`http://localhost:3001/api/bracket/preview?bracketId=${bracketId}`);
+      const response = await fetch(`${BASE_URL}/api/bracket/preview?bracketId=${bracketId}`);
       if (!response.ok) throw new Error('preview unavailable');
       const data = await response.json();
       if (data.canGenerate && data.preview) {
@@ -157,7 +159,7 @@ export default function BracketIdPage({ params }) {
   const handleLockBracket = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/bracket/lock', {
+      const response = await fetch(`${BASE_URL}/api/bracket/lock`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bracketId }),
@@ -172,7 +174,7 @@ export default function BracketIdPage({ params }) {
 
   const handleGuestLockIn = async (round) => {
     try {
-      const res = await fetch('http://localhost:3001/api/bracket/guest-lock-in', {
+      const res = await fetch(`${BASE_URL}/api/bracket/guest-lock-in`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ voterId, round, bracketId }),
@@ -185,7 +187,7 @@ export default function BracketIdPage({ params }) {
   };
 
   const handleSetWinner = async (matchupId, winnerId) => {
-    await fetch('http://localhost:3001/api/admin/set-winner', {
+    await fetch(`${BASE_URL}/api/admin/set-winner`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ matchupId, winnerId, bracketId }),
@@ -194,7 +196,7 @@ export default function BracketIdPage({ params }) {
   };
 
   const handlePublishRound = async (round) => {
-    await fetch('http://localhost:3001/api/admin/publish-round', {
+    await fetch(`${BASE_URL}/api/admin/publish-round`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ round, bracketId }),

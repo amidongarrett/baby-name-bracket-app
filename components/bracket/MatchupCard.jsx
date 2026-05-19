@@ -8,6 +8,8 @@
 "use client";
 
 import { useState } from 'react';
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 import NameCard from './NameCard';
 
 export default function MatchupCard({
@@ -121,7 +123,7 @@ export default function MatchupCard({
       const body = { voterId, selectedNameId };
       if (rolePayload) body.role = rolePayload;
 
-      const response = await fetch(`http://localhost:3001/api/votes/${matchupId}`, {
+      const response = await fetch(`${BASE_URL}/api/votes/${matchupId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

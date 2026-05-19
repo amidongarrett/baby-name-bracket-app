@@ -8,6 +8,8 @@
 import { useRef, useState } from 'react';
 import MatchupCard from './MatchupCard';
 
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 /**
  * Derives the current vote leader from a raw feeder matchup.
  * Returns { nameId, name, seed } or null (tied / no votes).
@@ -1162,7 +1164,7 @@ function MobileMatchupCard({
       const body = { voterId, selectedNameId };
       if (rolePayload) body.role = rolePayload;
 
-      const response = await fetch(`http://localhost:3001/api/votes/${matchupId}`, {
+      const response = await fetch(`${BASE_URL}/api/votes/${matchupId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

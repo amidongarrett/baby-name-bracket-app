@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useUser } from '@/contexts/UserContext';
 import { useBracket } from '@/contexts/BracketContext';
 
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 const ROUND_KEY_MAP = {
   'Round of 32':  'roundOf32',
   'Round of 16':  'roundOf16',
@@ -53,7 +55,7 @@ export default function BracketPickWinnerPage({ params }) {
   const fetchBracket = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`http://localhost:3001/api/bracket/${bracketId}`);
+      const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}`);
       if (!res.ok) throw new Error('Failed to fetch bracket');
       const data = await res.json();
       setBracket(data);
@@ -109,7 +111,7 @@ export default function BracketPickWinnerPage({ params }) {
     localStorage.removeItem('parentPicks');
     setPicks({});
     try {
-      await fetch('http://localhost:3001/api/bracket/reset-round', {
+      await fetch(`${BASE_URL}/api/bracket/reset-round`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bracketId }),
@@ -133,7 +135,7 @@ export default function BracketPickWinnerPage({ params }) {
     setAdvancing(true);
     try {
       const roundKey = ROUND_KEY_MAP[bracket?.currentRound] || 'roundOf32';
-      const res = await fetch('http://localhost:3001/api/bracket/advance', {
+      const res = await fetch(`${BASE_URL}/api/bracket/advance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ round: roundKey, bracketId }),

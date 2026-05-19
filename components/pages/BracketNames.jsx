@@ -6,6 +6,8 @@ import NameGenerator from '@/components/bracket/NameGenerator';
 import { useUser } from '@/contexts/UserContext';
 import { useBracket } from '@/contexts/BracketContext';
 
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 function getEffectiveRank(item, sharedNames) {
   if (item.isShared) {
     const shared = sharedNames.find(s => s.name === item.name);
@@ -58,7 +60,7 @@ export default function BracketNamesPage({ params }) {
   useEffect(() => {
     const checkAPIConnection = async () => {
       try {
-        const response = await fetch('http://localhost:3001/health');
+        const response = await fetch(`${BASE_URL}/health`);
         if (response.ok) {
           const data = await response.json();
           console.log('API Health Check:', data);
@@ -143,7 +145,7 @@ export default function BracketNamesPage({ params }) {
   // Fetch bracket data from API and update state
   const fetchBracketData = async () => {
     try {
-      const response = await fetch(`http://localhost:3001/api/bracket/${bracketId}`);
+      const response = await fetch(`${BASE_URL}/api/bracket/${bracketId}`);
       if (response.ok) {
         const data = await response.json();
         setCurrentBracket(data);
@@ -217,7 +219,7 @@ export default function BracketNamesPage({ params }) {
     if (!trimmedName || owner1Error) return;
 
     try {
-      const response = await fetch('http://localhost:3001/api/names', {
+      const response = await fetch(`${BASE_URL}/api/names`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -254,7 +256,7 @@ export default function BracketNamesPage({ params }) {
     if (!trimmedName || owner2Error) return;
 
     try {
-      const response = await fetch('http://localhost:3001/api/names', {
+      const response = await fetch(`${BASE_URL}/api/names`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -286,7 +288,7 @@ export default function BracketNamesPage({ params }) {
   // Delete name from backend and refresh data
   const handleDeleteName = async (nameId) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/names/${nameId}`, {
+      const response = await fetch(`${BASE_URL}/api/names/${nameId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bracketId })
@@ -307,7 +309,7 @@ export default function BracketNamesPage({ params }) {
   const handleRemoveShared = async (nameId) => {
     try {
       const removedBy = role;
-      const response = await fetch(`http://localhost:3001/api/shared-names/${nameId}`, {
+      const response = await fetch(`${BASE_URL}/api/shared-names/${nameId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ removedBy, bracketId })
@@ -326,7 +328,7 @@ export default function BracketNamesPage({ params }) {
   // Cancel a pending name transfer
   const handleRemovePending = async (nameId) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/pending-names/${nameId}`, {
+      const response = await fetch(`${BASE_URL}/api/pending-names/${nameId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bracketId })
@@ -345,7 +347,7 @@ export default function BracketNamesPage({ params }) {
   // Handle lock-in for owners
   const handleLockIn = async (owner) => {
     try {
-      const response = await fetch('http://localhost:3001/api/bracket/lock-in', {
+      const response = await fetch(`${BASE_URL}/api/bracket/lock-in`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
