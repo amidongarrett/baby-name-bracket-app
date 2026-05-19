@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -14,11 +15,16 @@ export default function AdminPanel({
   onWinnerSet,
   onPublishRound,
   onUnlockNames,
+  onDeleteBracket,
+  onRemoveOwner2,
   isOpen: isOpenProp,
   onToggle,
 }) {
   const [localOpen, setLocalOpen] = useState(false);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [showDeleteBracketModal, setShowDeleteBracketModal] = useState(false);
+  const [showRemoveOwner2Modal, setShowRemoveOwner2Modal] = useState(false);
+  const [dangerLoading, setDangerLoading] = useState(false);
 
   const open = isOpenProp !== undefined ? isOpenProp : localOpen;
   const toggle = onToggle ?? (() => setLocalOpen(p => !p));
@@ -200,7 +206,11 @@ export default function AdminPanel({
               <button
                 onClick={async () => {
                   if (!window.confirm('Reset and regenerate the bracket? This will delete all votes.')) return;
-                  await fetch(`${BASE_URL}/api/admin/reset-and-regenerate`, { method: 'POST' });
+                  await fetch(`${BASE_URL}/api/admin/reset-and-regenerate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bracketId: bracket._id }),
+                  });
                   window.location.reload();
                 }}
                 className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 transition-colors"
@@ -236,7 +246,11 @@ export default function AdminPanel({
                           <button
                             onClick={async () => {
                               setShowUnlockModal(false);
-                              await fetch(`${BASE_URL}/api/admin/unlock-names`, { method: 'POST' });
+                              await fetch(`${BASE_URL}/api/admin/unlock-names`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ bracketId: bracket._id }),
+                              });
                               onUnlockNames();
                             }}
                             className="px-4 py-2 text-sm font-bold rounded bg-red-600 text-white hover:bg-red-700"
@@ -250,6 +264,59 @@ export default function AdminPanel({
                 </>
               )}
             </div>
+
+            {/* Danger Zone — Delete Bracket / Remove Owner 2 */}
+            <div className="mt-6 border-t border-red-200 dark:border-red-900 pt-4">
+              <p className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wider mb-3">
+                Danger Zone
+              </p>
+              <div className="flex gap-3 flex-wrap">
+                <button
+                  onClick={() => setShowDeleteBracketModal(true)}
+                  className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 transition-colors"
+                >
+                  Delete Bracket
+                </button>
+                <button
+                  onClick={() => setShowRemoveOwner2Modal(true)}
+                  className="px-4 py-2 bg-amber-600 text-white text-xs font-bold rounded hover:bg-amber-700 transition-colors"
+                >
+                  Remove Owner 2
+                </button>
+              </div>
+            </div>
+
+            {showDeleteBracketModal && (
+              <ConfirmModal
+                title="Delete Bracket"
+                message="This permanently deletes all names, matchups, and votes. This cannot be undone."
+                confirmLabel="Yes, Delete"
+                onConfirm={async () => {
+                  setDangerLoading(true);
+                  await onDeleteBracket();
+                  setShowDeleteBracketModal(false);
+                  setDangerLoading(false);
+                }}
+                onCancel={() => setShowDeleteBracketModal(false)}
+                loading={dangerLoading}
+              />
+            )}
+
+            {showRemoveOwner2Modal && (
+              <ConfirmModal
+                title="Remove Owner 2"
+                message="This clears all Owner 2 names, resets shared-name flags, and reverts the bracket to draft with no matchups."
+                confirmLabel="Yes, Remove"
+                onConfirm={async () => {
+                  setDangerLoading(true);
+                  await onRemoveOwner2();
+                  setShowRemoveOwner2Modal(false);
+                  setDangerLoading(false);
+                }}
+                onCancel={() => setShowRemoveOwner2Modal(false)}
+                loading={dangerLoading}
+              />
+            )}
           </div>
         )}
       </div>
