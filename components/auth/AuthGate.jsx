@@ -2,18 +2,20 @@
 
 import { useUser } from '@/contexts/UserContext';
 import AuthFlow from './AuthFlow';
+import ProfileSetupModal from './ProfileSetupModal';
 
 /**
  * AuthGate — wraps the app's main content and shows the OTP sign-in flow
- * until the user is authenticated.
+ * until the user is authenticated and has a complete profile.
  *
  * States:
- *   - Loading (token revalidation in progress) → spinner
- *   - Unauthenticated                          → centered AuthFlow
- *   - Authenticated                            → children rendered as-is
+ *   - Loading (token revalidation in progress)  → spinner
+ *   - Unauthenticated                           → centered AuthFlow
+ *   - Authenticated, profile incomplete         → ProfileSetupModal (non-dismissible)
+ *   - Authenticated, profile complete           → children rendered as-is
  */
 export default function AuthGate({ children }) {
-  const { hydrated, authLoading, user, token } = useUser();
+  const { hydrated, authLoading, user, token, isProfileComplete } = useUser();
 
   if (!hydrated || authLoading) {
     return (
@@ -32,6 +34,10 @@ export default function AuthGate({ children }) {
         <AuthFlow onComplete={() => {/* login() in AuthFlow already updates context */}} />
       </div>
     );
+  }
+
+  if (!isProfileComplete) {
+    return <ProfileSetupModal />;
   }
 
   return <>{children}</>;

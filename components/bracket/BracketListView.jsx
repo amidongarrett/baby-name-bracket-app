@@ -165,34 +165,38 @@ export default function BracketListView({
   const championNameId = bracketMatchups.championNameId || null;
   const isTournamentComplete = status === 'completed' || !!championNameId;
 
+  const RoundNavRow = (
+    <div className="flex items-center justify-between pt-4 mb-1">
+      <button
+        onClick={() => setDisplayRoundKey(ROUND_ORDER[displayRoundIndex - 1])}
+        disabled={!canGoBack}
+        className="p-2 rounded-lg disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        aria-label="Previous round"
+      >
+        <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+        </svg>
+      </button>
+      <h3 className="text-lg font-bold text-gray-700 dark:text-gray-200">
+        {ROUND_DISPLAY[displayRoundKey] || displayRoundKey}
+      </h3>
+      <button
+        onClick={() => setDisplayRoundKey(ROUND_ORDER[displayRoundIndex + 1])}
+        disabled={!canGoForward}
+        className="p-2 rounded-lg disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        aria-label="Next round"
+      >
+        <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+        </svg>
+      </button>
+    </div>
+  );
+
   return (
     <div className="space-y-3 px-4 pb-8">
       {/* Round navigation row */}
-      <div className="flex items-center justify-between pt-4 mb-1">
-        <button
-          onClick={() => setDisplayRoundKey(ROUND_ORDER[displayRoundIndex - 1])}
-          disabled={!canGoBack}
-          className="p-2 rounded-lg disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          aria-label="Previous round"
-        >
-          <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-          </svg>
-        </button>
-        <h3 className="text-lg font-bold text-gray-700 dark:text-gray-200">
-          {ROUND_DISPLAY[displayRoundKey] || displayRoundKey}
-        </h3>
-        <button
-          onClick={() => setDisplayRoundKey(ROUND_ORDER[displayRoundIndex + 1])}
-          disabled={!canGoForward}
-          className="p-2 rounded-lg disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          aria-label="Next round"
-        >
-          <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-          </svg>
-        </button>
-      </div>
+      {RoundNavRow}
 
       {isTournamentComplete ? (
         <div className="bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-950/30 dark:to-amber-950/30 rounded-2xl border-2 border-yellow-400 dark:border-yellow-700 p-6 text-center">
@@ -230,18 +234,23 @@ export default function BracketListView({
           {/* Guest: Lock My Bracket — only when tournament is active (not yet complete) and all picks made */}
           {status === 'active' && viewerRole === 'guest' && !isTournamentComplete && !isLocked && (
             <div className="mt-4 text-center">
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                {allPicksFilled
-                  ? 'All picks made! Lock in your bracket.'
-                  : 'Complete all your picks to lock in.'}
-              </p>
-              <button
-                onClick={onLockIn}
-                disabled={!allPicksFilled}
-                className="px-6 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-lg shadow hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-sm"
-              >
-                Lock My Bracket
-              </button>
+              {allPicksFilled ? (
+                <>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    All picks made! Lock in your bracket.
+                  </p>
+                  <button
+                    onClick={onLockIn}
+                    className="px-6 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-lg shadow hover:from-green-600 hover:to-emerald-600 transition-all text-sm"
+                  >
+                    Lock My Bracket
+                  </button>
+                </>
+              ) : (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Complete all your picks to lock in.
+                </p>
+              )}
             </div>
           )}
           {status === 'active' && viewerRole === 'guest' && !isTournamentComplete && isLocked && (
@@ -300,6 +309,9 @@ export default function BracketListView({
               )}
             </div>
           )}
+
+          {/* Bottom round navigation row — mirrors the top row */}
+          {RoundNavRow}
         </>
       )}
     </div>

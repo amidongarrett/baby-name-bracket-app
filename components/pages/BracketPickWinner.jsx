@@ -31,11 +31,22 @@ export default function BracketPickWinnerPage({ params }) {
   const [owner1Bracket, setOwner1Bracket] = useState(null);
   const [owner2Bracket, setOwner2Bracket] = useState(null);
   const [advancing, setAdvancing] = useState(false);
+  const [voteTallies, setVoteTallies] = useState(null);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => setCurrentBracket(null);
   }, []);
+
+  const fetchVoteTallies = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}/vote-tallies`);
+      if (res.ok) {
+        const data = await res.json();
+        setVoteTallies(data.tallies || null);
+      }
+    } catch {}
+  };
 
   const fetchBracket = async () => {
     try {
@@ -55,6 +66,8 @@ export default function BracketPickWinnerPage({ params }) {
 
   useEffect(() => { fetchBracket(); }, []);
 
+  useEffect(() => { if (bracket) fetchVoteTallies(); }, [bracket?.currentRound]);
+
   const fetchOwnerBrackets = async () => {
     if (!bracketId || !bracket?.owner1UserId) return;
     const headers = { Authorization: `Bearer ${token}` };
@@ -67,6 +80,39 @@ export default function BracketPickWinnerPage({ params }) {
   };
 
   useEffect(() => { fetchOwnerBrackets(); }, [bracket?.owner1UserId]);
+
+  // ── Real-time polling (active brackets only) ──────────────────────────────
+  useEffect(() => {
+    if (bracket?.status !== 'active') return;
+
+    let intervalId;
+
+    const poll = async () => {
+      await Promise.all([fetchVoteTallies(), fetchOwnerBrackets()]);
+    };
+
+    const startPolling = () => {
+      intervalId = setInterval(poll, 9000);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        clearInterval(intervalId);
+        intervalId = undefined;
+      } else {
+        poll();
+        startPolling();
+      }
+    };
+
+    startPolling();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [bracket?.status]);
 
   // ── Derived data ──────────────────────────────────────────────────────────
 
@@ -82,15 +128,15 @@ export default function BracketPickWinnerPage({ params }) {
   const currentRoundKey = ROUND_KEY_MAP[bracket?.currentRound] || 'roundOf32';
 
   const matchups = bracket?.status === 'active'
-    ? (bracket.matchups?.[currentRoundKey] || []).map((m) => {
+    ? (bracket.matchups?.[currentRoundKey] || []).map((m, index) => {
         const n1 = nameMap[m.name1Id];
         const n2 = nameMap[m.name2Id];
         return {
           ...m,
           name1Value: n1?.value || 'TBD',
           name2Value: n2?.value || 'TBD',
-          votes1: m.votes?.name1Votes || 0,
-          votes2: m.votes?.name2Votes || 0,
+          votes1: voteTallies?.[currentRoundKey]?.[index]?.name1Votes ?? 0,
+          votes2: voteTallies?.[currentRoundKey]?.[index]?.name2Votes ?? 0,
         };
       })
     : [];
@@ -159,6 +205,7 @@ export default function BracketPickWinnerPage({ params }) {
       setOwner1Bracket(null);
       setOwner2Bracket(null);
       await fetchBracket();
+      await fetchVoteTallies();
     } catch (err) {
       setError(err.message);
     } finally {

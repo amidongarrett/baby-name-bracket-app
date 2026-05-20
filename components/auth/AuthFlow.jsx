@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { requestCode, verifyCode, setName } from '@/lib/authApi';
 import { useUser } from '@/contexts/UserContext';
-
-const ICON_OPTIONS = ['👤','👨','👩','🐼','🦁','🐶','🐨','🦊','🐸','🐯','🦄','🐻','🐮'];
+import { ICON_OPTIONS } from '@/lib/constants';
 const TEST_EMAIL_RE = /^test\+.+@amidonlabs\.com$/i;
 
 /**

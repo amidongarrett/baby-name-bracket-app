@@ -38,6 +38,7 @@ export default function BracketIdPage({ params }) {
   const [userBracket, setUserBracket] = useState(null);
   const [ownerPicks, setOwnerPicks] = useState({}); // { [matchupId]: { owner1NameId, owner2NameId } }
   const [publishedRounds, setPublishedRounds] = useState([]); // rounds admin has published
+  const [voteTallies, setVoteTallies] = useState(null);
   const [showDeleteGuestModal, setShowDeleteGuestModal] = useState(false);
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -92,11 +93,23 @@ export default function BracketIdPage({ params }) {
     if (voterId) fetchUserBracket(voterId);
   }, [voterId]);
 
+  const fetchVoteTallies = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}/vote-tallies`);
+      if (res.ok) {
+        const data = await res.json();
+        setVoteTallies(data.tallies || null);
+      }
+    } catch {}
+  };
+
   // Fetch owner picks on role change or bracket status change (all roles — guests need
   // this to derive whether any owner has voted on a matchup for the lockout UI)
   useEffect(() => {
     fetchOwnerPicks();
   }, [viewerRole, bracket?.status]);
+
+  useEffect(() => { if (bracket?.status === 'active') fetchVoteTallies(); }, [bracket?.currentRound]);
 
   const fetchBracket = async () => {
     try {
@@ -253,6 +266,7 @@ export default function BracketIdPage({ params }) {
       const roundKey = ROUND_KEY_MAP[bracket?.currentRound] || 'roundOf32';
       await advanceTournamentRound(roundKey, bracketId);
       await fetchBracket();
+      await fetchVoteTallies();
     } catch (err) {
       setError(err.message);
       setLoading(false);
@@ -293,7 +307,7 @@ export default function BracketIdPage({ params }) {
     [1, 16], [8, 9], [4, 13], [5, 12], [2, 15], [7, 10], [3, 14], [6, 11],
   ];
 
-  const normalizeMatchup = (m, i) => {
+  const normalizeMatchup = (m, i, roundKey) => {
     const name1Obj  = m.name1 && typeof m.name1 === 'object' ? m.name1 : null;
     const name2Obj  = m.name2 && typeof m.name2 === 'object' ? m.name2 : null;
 
@@ -310,8 +324,8 @@ export default function BracketIdPage({ params }) {
       name2Id: m.name2Id || name2Obj?.id || null,
       seed1: m.seed1 || name1Obj?.seed || name1Obj?.rank || s1default,
       seed2: m.seed2 || name2Obj?.seed || name2Obj?.rank || s2default,
-      votes1: m.votes1 ?? m.votes?.name1Votes ?? 0,
-      votes2: m.votes2 ?? m.votes?.name2Votes ?? 0,
+      votes1: voteTallies?.[roundKey]?.[i]?.name1Votes ?? m.votes1 ?? 0,
+      votes2: voteTallies?.[roundKey]?.[i]?.name2Votes ?? m.votes2 ?? 0,
       winnerId: m.winnerId || null,
       isPlaceholder1: name1Obj?.isPlaceholder || false,
       isPlaceholder2: name2Obj?.isPlaceholder || false,
@@ -329,12 +343,12 @@ export default function BracketIdPage({ params }) {
     : (bracket.matchups?.[currentRoundKey] || []);
 
   let matchupGrid = rawMatchups.length > 0
-    ? rawMatchups.map((m, i) => normalizeMatchup(m, i))
+    ? rawMatchups.map((m, i) => normalizeMatchup(m, i, currentRoundKey))
     : Array.from({ length: 16 }, (_, i) => normalizeMatchup({
         _id: `placeholder-${i}`,
         name1: { value: 'TBD', isPlaceholder: true, seed: SEED_PAIRS[i]?.[0] || i * 2 + 1 },
         name2: { value: 'TBD', isPlaceholder: true, seed: SEED_PAIRS[i]?.[1] || i * 2 + 2 },
-      }, i));
+      }, i, currentRoundKey));
 
   // Derive bracket display name from owner names if available
   const bracketTitle = (bracket.owner1Name && bracket.owner2Name)

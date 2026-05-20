@@ -21,8 +21,8 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 function getFeederLeader(feeder, nameMap, slotBase) {
   if (!feeder) return null;
 
-  const n1Votes = feeder.votes?.name1Votes ?? 0;
-  const n2Votes = feeder.votes?.name2Votes ?? 0;
+  const n1Votes = feeder.votes1 ?? feeder.votes?.name1Votes ?? 0;
+  const n2Votes = feeder.votes2 ?? feeder.votes?.name2Votes ?? 0;
 
   // Determine which side is the leader
   let leadSide; // 'name1' | 'name2' | null
@@ -181,6 +181,18 @@ export default function BracketView({
   const owner2R3Ref = useRef(null);
   const owner2R2Ref = useRef(null);
   const owner2R1Ref = useRef(null);
+
+  // Mobile round navigation state
+  const [displayRoundKey, setDisplayRoundKey] = useState(activeRoundKey);
+
+  const ROUND_ORDER_MOB = ['roundOf32', 'roundOf16', 'elite8', 'final4', 'championship'];
+  const ROUND_DISPLAY_MOB = {
+    roundOf32:    'Round of 32',
+    roundOf16:    'Sweet 16',
+    elite8:       'Elite 8',
+    final4:       'Final 4',
+    championship: 'Championship',
+  };
 
   // Drag-to-scroll: horizontal drag scrolls the bracket container,
   // vertical drag scrolls the page — both work within the same drag area.
@@ -1082,6 +1094,55 @@ export default function BracketView({
             </div>
           </div>
         </div>
+
+      {/* Mobile-only round navigation sticky bar */}
+      {(() => {
+        const ROUND_REF_MAP = {
+          roundOf32:    owner1R1Ref,
+          roundOf16:    owner1R2Ref,
+          elite8:       owner1R3Ref,
+          final4:       championshipRef,
+          championship: championshipRef,
+        };
+        const displayRoundIndex = ROUND_ORDER_MOB.indexOf(displayRoundKey);
+        const canGoBack    = displayRoundIndex > 0;
+        const canGoForward = displayRoundIndex < ROUND_ORDER_MOB.length - 1;
+        return (
+          <div className="flex md:hidden items-center justify-between px-4 py-3 sticky bottom-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800 z-30">
+            <button
+              onClick={() => {
+                const newKey = ROUND_ORDER_MOB[displayRoundIndex - 1];
+                setDisplayRoundKey(newKey);
+                scrollToRound(ROUND_REF_MAP[newKey]);
+              }}
+              disabled={!canGoBack}
+              className="p-2 rounded-lg disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              aria-label="Previous round"
+            >
+              <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+              </svg>
+            </button>
+            <span className="text-sm font-bold text-gray-700 dark:text-gray-200">
+              {ROUND_DISPLAY_MOB[displayRoundKey] || displayRoundKey}
+            </span>
+            <button
+              onClick={() => {
+                const newKey = ROUND_ORDER_MOB[displayRoundIndex + 1];
+                setDisplayRoundKey(newKey);
+                scrollToRound(ROUND_REF_MAP[newKey]);
+              }}
+              disabled={!canGoForward}
+              className="p-2 rounded-lg disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              aria-label="Next round"
+            >
+              <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+              </svg>
+            </button>
+          </div>
+        );
+      })()}
     </>
   );
 }

@@ -111,6 +111,8 @@ export function UserProvider({ children }) {
   const effectiveUserType = user ? userType : 'guest';
   const current = USER_TYPES.find(t => t.id === effectiveUserType) ?? USER_TYPES[0];
 
+  const isProfileComplete = !!(user?.displayName && user?.icon);
+
   const value = {
     // OTP auth
     token,
@@ -119,6 +121,7 @@ export function UserProvider({ children }) {
     logout,
     updateUser,
     authLoading,
+    isProfileComplete,
 
     // Core identity
     userType: effectiveUserType,

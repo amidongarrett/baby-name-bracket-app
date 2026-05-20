@@ -177,6 +177,13 @@ export default function Navbar() {
                 {/* ── MAIN PANEL ─────────────────────────────────────────── */}
                 {activePanel === 'main' && (
                   <>
+                    {/* User identity — always first row */}
+                    <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+                      <p className="text-base font-bold text-foreground">
+                        {(user?.icon || '😊') + ' '}{user?.displayName || displayName || 'Guest'}
+                      </p>
+                    </div>
+
                     {/* View Bracket — shown on all bracket-scoped pages */}
                     {showViewBracket && (
                       <div className="px-2 py-1 border-b border-gray-100 dark:border-gray-800">
@@ -200,13 +207,6 @@ export default function Navbar() {
                         </Link>
                       </div>
                     )}
-
-                    {/* User identity */}
-                    <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-                      <p className="text-sm font-semibold text-foreground">
-                        {(user?.icon || '😊') + ' '}{user?.displayName || displayName}
-                      </p>
-                    </div>
 
                     {/* Profile (all users) */}
                     <div className="px-2 py-1 border-b border-gray-100 dark:border-gray-800">
