@@ -32,6 +32,12 @@ export default function BracketNamesPage({ params }) {
   const [owner1Error, setOwner1Error] = useState('');
   const [owner2Error, setOwner2Error] = useState('');
 
+  // Owner display names and icons
+  const [owner1DisplayName, setOwner1DisplayName] = useState('Owner 1');
+  const [owner2DisplayName, setOwner2DisplayName] = useState('Owner 2');
+  const [owner1Icon, setOwner1Icon] = useState('👤');
+  const [owner2Icon, setOwner2Icon] = useState('👤');
+
   // Lock-in status tracking
   const [owner1LockedIn, setOwner1LockedIn] = useState(false);
   const [owner2LockedIn, setOwner2LockedIn] = useState(false);
@@ -192,6 +198,11 @@ export default function BracketNamesPage({ params }) {
           setOwner1LockedIn(data.owner1LockedIn || false);
           setOwner2LockedIn(data.owner2LockedIn || false);
           setBracketStatus(data.status || 'draft');
+
+          setOwner1DisplayName(data.owner1Name || 'Owner 1');
+          setOwner2DisplayName(data.owner2Name || 'Owner 2');
+          setOwner1Icon(data.owner1Icon || '👤');
+          setOwner2Icon(data.owner2Icon || '👤');
 
           if (data.owner1LockedIn && data.owner2LockedIn && data.status === 'active') {
             setShowCelebration(true);
@@ -427,7 +438,7 @@ export default function BracketNamesPage({ params }) {
           {/* Owner 1 Column */}
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
             <h2 className="text-2xl font-semibold text-foreground mb-4">
-              Owner 1 (Husband)
+              {owner1DisplayName} {owner1Icon}
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               {owner1Names.length} / {MAX_NAMES} names
@@ -479,7 +490,7 @@ export default function BracketNamesPage({ params }) {
                   <span className="font-bold text-lg">Names Locked In!</span>
                 </div>
                 <p className="text-center text-sm text-green-600 dark:text-green-500 mt-2">
-                  {owner2LockedIn ? 'Both parents ready! Bracket is active.' : 'Waiting for Wife to lock in...'}
+                  {owner2LockedIn ? 'Both parents ready! Bracket is active.' : `Waiting for ${owner2DisplayName} to lock in...`}
                 </p>
               </div>
             )}
@@ -561,7 +572,7 @@ export default function BracketNamesPage({ params }) {
                           <span className="text-foreground/70">{item.name}</span>
                         </div>
                         <span className="text-xs text-gray-500 dark:text-gray-400 italic ml-8">
-                          Shared name - on Wife's list
+                          {`Shared name - on ${owner2DisplayName}'s list`}
                         </span>
                       </div>
                     </div>
@@ -614,7 +625,7 @@ export default function BracketNamesPage({ params }) {
                         )}
                       </div>
                       <p className="text-xs text-gray-600 dark:text-gray-400 ml-12">
-                        First added by: <span className="font-medium">{item.addedBy === 'owner1' ? 'Husband' : 'Wife'}</span>
+                        First added by: <span className="font-medium">{item.addedBy === 'owner1' ? owner1DisplayName : owner2DisplayName}</span>
                       </p>
                     </div>
                   ))
@@ -625,7 +636,7 @@ export default function BracketNamesPage({ params }) {
           {/* Owner 2 Column */}
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
             <h2 className="text-2xl font-semibold text-foreground mb-4">
-              Owner 2 (Wife)
+              {owner2DisplayName} {owner2Icon}
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               {owner2Names.length} / {MAX_NAMES} names
@@ -677,7 +688,7 @@ export default function BracketNamesPage({ params }) {
                   <span className="font-bold text-lg">Names Locked In!</span>
                 </div>
                 <p className="text-center text-sm text-green-600 dark:text-green-500 mt-2">
-                  {owner1LockedIn ? 'Both parents ready! Bracket is active.' : 'Waiting for Husband to lock in...'}
+                  {owner1LockedIn ? 'Both parents ready! Bracket is active.' : `Waiting for ${owner1DisplayName} to lock in...`}
                 </p>
               </div>
             )}
@@ -759,7 +770,7 @@ export default function BracketNamesPage({ params }) {
                           <span className="text-foreground/70">{item.name}</span>
                         </div>
                         <span className="text-xs text-gray-500 dark:text-gray-400 italic ml-8">
-                          Shared name - on Husband's list
+                          {`Shared name - on ${owner1DisplayName}'s list`}
                         </span>
                       </div>
                     </div>

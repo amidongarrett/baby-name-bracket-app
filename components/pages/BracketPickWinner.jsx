@@ -23,7 +23,7 @@ export default function BracketPickWinnerPage({ params }) {
 
   const isOwner = isOwnerOfCurrentBracket;
   const displayName = user?.displayName;
-  const displayEmoji = isOwner ? '👑' : '👤';
+  const displayEmoji = user?.icon || '😊';
 
   const [bracket, setBracket]   = useState(null);
   const [loading, setLoading]   = useState(true);
@@ -69,6 +69,9 @@ export default function BracketPickWinnerPage({ params }) {
   useEffect(() => { fetchOwnerBrackets(); }, [bracket?.owner1UserId]);
 
   // ── Derived data ──────────────────────────────────────────────────────────
+
+  const owner1Icon = bracket?.owner1Icon || '👤';
+  const owner2Icon = bracket?.owner2Icon || '👤';
 
   const nameMap = {};
   if (bracket) {
@@ -292,7 +295,7 @@ export default function BracketPickWinnerPage({ params }) {
       {!isOwner && (
         <div className="max-w-3xl mx-auto px-4 pt-5">
           <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-700 rounded-xl p-4 text-sm text-amber-800 dark:text-amber-300">
-            <strong>👤 You're viewing as a Guest.</strong> Open the menu and switch to Husband or Wife to make picks.
+            <strong>👤 You're viewing as a Guest.</strong> Open the menu and switch to {bracket?.owner1Name || 'Owner 1'} or {bracket?.owner2Name || 'Owner 2'} to make picks.
           </div>
         </div>
       )}
@@ -348,12 +351,12 @@ export default function BracketPickWinnerPage({ params }) {
                 <div className="flex gap-2 min-h-[20px]">
                   {isPickedByOwner1 && (
                     <span className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-medium">
-                      O1
+                      {owner1Icon} {bracket?.owner1Name || 'Owner 1'}
                     </span>
                   )}
                   {isPickedByOwner2 && (
                     <span className="text-xs bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full font-medium">
-                      O2
+                      {owner2Icon} {bracket?.owner2Name || 'Owner 2'}
                     </span>
                   )}
                 </div>
@@ -381,7 +384,7 @@ export default function BracketPickWinnerPage({ params }) {
                   )}
                   {status === 'partial' && (
                     <span className="text-xs text-gray-400">
-                      Waiting for {!owner1Pick ? 'O1' : 'O2'}…
+                      Waiting for {!owner1Pick ? `${owner1Icon} ${bracket?.owner1Name || 'Owner 1'}` : `${owner2Icon} ${bracket?.owner2Name || 'Owner 2'}`}…
                     </span>
                   )}
                 </div>

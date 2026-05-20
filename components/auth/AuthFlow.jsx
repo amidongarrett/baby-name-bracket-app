@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { requestCode, verifyCode, setName } from '@/lib/authApi';
 import { useUser } from '@/contexts/UserContext';
 
+const ICON_OPTIONS = ['👤','👨','👩','🐼','🦁','🐶','🐨','🦊','🐸','🐯','🦄','🐻','🐮'];
+const TEST_EMAIL_RE = /^test\+.+@amidonlabs\.com$/i;
+
 /**
  * Multi-step OTP authentication flow.
  *
@@ -21,6 +24,7 @@ export default function AuthFlow({ onComplete }) {
   const [email, setEmail]       = useState('');
   const [code, setCode]         = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [icon, setIcon]         = useState('👤');
   const [error, setError]       = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -32,8 +36,21 @@ export default function AuthFlow({ onComplete }) {
     setError('');
     setSubmitting(true);
     try {
-      await requestCode(email.trim());
-      setStep('code');
+      const trimmedEmail = email.trim();
+      if (TEST_EMAIL_RE.test(trimmedEmail)) {
+        // Test-email: skip OTP entirely — backend accepts any code
+        const { token: newToken, isNewUser, user } = await verifyCode(trimmedEmail, '000000');
+        login(newToken, user);
+        if (isNewUser) {
+          setPendingToken(newToken);
+          setStep('name');
+        } else {
+          onComplete();
+        }
+      } else {
+        await requestCode(trimmedEmail);
+        setStep('code');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -70,7 +87,7 @@ export default function AuthFlow({ onComplete }) {
     }
     setSubmitting(true);
     try {
-      const { user: updatedUser } = await setName(displayName.trim(), pendingToken || token);
+      const { user: updatedUser } = await setName(displayName.trim(), pendingToken || token, icon);
       login(pendingToken || token, updatedUser);
       onComplete();
     } catch (err) {
@@ -170,6 +187,25 @@ export default function AuthFlow({ onComplete }) {
               onChange={e => setDisplayName(e.target.value)}
               className={inputClass}
             />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-300">Choose your icon</label>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {ICON_OPTIONS.map(opt => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => setIcon(opt)}
+                  className={`text-2xl rounded-lg p-1.5 border-2 transition-colors ${
+                    icon === opt
+                      ? 'border-indigo-500 bg-indigo-900/40'
+                      : 'border-gray-700 bg-gray-800 hover:border-gray-500'
+                  }`}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
           </div>
           {error && <p className="text-sm text-red-400">{error}</p>}
           <button type="submit" disabled={submitting} className={buttonClass}>

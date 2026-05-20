@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
-import Link from 'next/link';
 import BracketView from '@/components/bracket/BracketView';
 import BracketListView from '@/components/bracket/BracketListView';
 import { advanceTournamentRound } from '@/utils/api';
@@ -216,6 +215,22 @@ export default function BracketIdPage({ params }) {
     } catch {}
   };
 
+  const handleResetPicks = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}/my-bracket/reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: voterId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUserBracket(data);
+      }
+    } catch (err) {
+      console.error('Reset picks error:', err);
+    }
+  };
+
   const handleDeleteGuestSession = async () => {
     try {
       const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}/guest`, {
@@ -333,31 +348,7 @@ export default function BracketIdPage({ params }) {
         <div className="max-w-7xl mx-auto px-4 py-5">
           <div className="flex items-center justify-between">
             <div>
-              <div className="flex items-center gap-3 mb-1">
-                <Link
-                  href="/"
-                  className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors mr-1"
-                >
-                  &larr; Lobby
-                </Link>
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{bracketTitle}</h1>
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                  bracket.championNameId
-                    ? 'bg-yellow-100 text-yellow-800 border border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700'
-                    : bracket.status === 'draft'
-                      ? 'bg-yellow-100 text-yellow-800 border border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700'
-                      : 'bg-green-100 text-green-800 border border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700'
-                }`}>
-                  {bracket.championNameId
-                    ? 'Champion Crowned!'
-                    : bracket.status === 'draft'
-                      ? 'Draft'
-                      : 'Active — Voting Open'}
-                </span>
-              </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {bracket.totalNames ?? 0} / 32 names · {bracket.currentRound || 'Round of 32'}
-              </p>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{bracketTitle}</h1>
             </div>
 
             <div className="flex items-center gap-3">
@@ -384,20 +375,6 @@ export default function BracketIdPage({ params }) {
                     List
                   </button>
                 </div>
-              )}
-              {bracket.status === 'draft' && (
-                <button
-                  onClick={handleLockBracket}
-                  disabled={bracket.totalNames !== 32}
-                  className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg shadow hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                  Lock & Start Voting
-                </button>
-              )}
-              {bracket.status === 'active' && (
-                <span className="px-4 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-sm">
-                  Bracket Locked
-                </span>
               )}
             </div>
           </div>
@@ -427,23 +404,6 @@ export default function BracketIdPage({ params }) {
         </div>
       )}
 
-      {/* Info banner */}
-      <div className="max-w-7xl mx-auto px-4 pt-5">
-        {bracket.status === 'draft' && (
-          <div className="mb-4 bg-blue-50 dark:bg-blue-950/30 border-l-4 border-blue-500 p-3 rounded text-sm text-blue-800 dark:text-blue-300">
-            <strong>Server-Side Preview:</strong> Shows how the bracket will look once locked (March Madness seeding: 1v32, 2v31…).
-            {previewMatchups.length === 0
-              ? ' Add all 32 names to see the preview.'
-              : ' Ready — click "Lock & Start Voting" above.'}
-          </div>
-        )}
-        {bracket.status === 'active' && !bracket.championNameId && (
-          <div className="mb-4 bg-green-50 dark:bg-green-950/30 border-l-4 border-green-500 p-3 rounded text-sm text-green-800 dark:text-green-300">
-            <strong>Bracket Locked.</strong> Guests can now vote on matchups. Use <strong>Admin → Pick Winner of Round</strong> to advance when ready.
-          </div>
-        )}
-      </div>
-
       {/* Bracket */}
       <div className="pb-10">
         {viewMode === 'list' ? (
@@ -460,6 +420,7 @@ export default function BracketIdPage({ params }) {
             nameMap={nameMap}
             onPick={handlePick}
             onLockIn={handleGuestLockIn}
+            onResetPicks={handleResetPicks}
             bracketId={bracketId}
             onProceedToNextRound={fetchBracket}
           />
@@ -476,6 +437,7 @@ export default function BracketIdPage({ params }) {
             bracketMatchups={bracket?.matchups || {}}
             nameMap={nameMap}
             onLockIn={handleGuestLockIn}
+            onResetPicks={handleResetPicks}
             onPick={handlePick}
           />
         )}

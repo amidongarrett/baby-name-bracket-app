@@ -5,10 +5,13 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUser } from '@/contexts/UserContext';
 import { useBracket } from '@/contexts/BracketContext';
+import { updateProfile } from '@/lib/authApi';
 import InviteModal from '@/components/bracket/InviteModal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+const PICKER_ICONS = ['👤','👨','👩','🐼','🦁','🐶','🐨','🦊','🐸','🐯','🦄','🐻','🐮'];
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -19,6 +22,7 @@ export default function Navbar() {
   const [showResetModal, setShowResetModal] = useState(false);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [dangerLoading, setDangerLoading] = useState(false);
+  const [iconSaving, setIconSaving] = useState(false);
   const menuRef  = useRef(null);
   const buttonRef = useRef(null);
   const pathname = usePathname();
@@ -27,7 +31,9 @@ export default function Navbar() {
   const {
     displayName,
     logout,
+    token,
     user,
+    updateUser,
   } = useUser();
 
   const { isOwnerOfCurrentBracket, currentBracketId, currentBracket, ownerRole } = useBracket();
@@ -75,14 +81,14 @@ export default function Navbar() {
 
   async function handleDeleteBracket() {
     setDangerLoading(true);
-    await fetch(`${BASE_URL}/api/bracket/${currentBracketId}`, { method: 'DELETE' });
+    await fetch(`${BASE_URL}/api/bracket/${currentBracketId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
     setDangerLoading(false);
     window.location.href = '/';
   }
 
   async function handleRemoveOwner2() {
     setDangerLoading(true);
-    await fetch(`${BASE_URL}/api/bracket/${currentBracketId}/owner2`, { method: 'DELETE' });
+    await fetch(`${BASE_URL}/api/bracket/${currentBracketId}/owner2`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
     setDangerLoading(false);
     window.location.reload();
   }
@@ -91,7 +97,7 @@ export default function Navbar() {
     setDangerLoading(true);
     await fetch(`${BASE_URL}/api/admin/reset-and-regenerate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ bracketId: currentBracketId }),
     });
     setDangerLoading(false);
@@ -102,11 +108,22 @@ export default function Navbar() {
     setDangerLoading(true);
     await fetch(`${BASE_URL}/api/admin/unlock-names`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ bracketId: currentBracketId }),
     });
     setDangerLoading(false);
     window.location.reload();
+  }
+
+  async function handleIconSelect(icon) {
+    if (iconSaving || icon === user?.icon) return;
+    setIconSaving(true);
+    try {
+      const data = await updateProfile(undefined, undefined, token, icon);
+      if (data?.user) updateUser(data.user);
+    } finally {
+      setIconSaving(false);
+    }
   }
 
   return (
@@ -119,8 +136,8 @@ export default function Navbar() {
             href="/"
             className="flex items-center gap-2 font-bold text-foreground transition-opacity hover:opacity-80"
           >
-            <span className="text-xl">🏆</span>
-            <span className="text-lg">Baby Name Bracket</span>
+            <span className="text-xl">🏠</span>
+            <span className="text-lg">All Brackets</span>
           </Link>
 
           {/* Menu button — shows authenticated user's display name */}
@@ -138,7 +155,7 @@ export default function Navbar() {
               }`}
             >
               <span className="hidden sm:inline text-xs">
-                {isOwnerOfCurrentBracket ? '👑' : ''} {user?.displayName || displayName}
+                {(user?.icon || '😊') + ' '}{user?.displayName || displayName}
               </span>
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
                 {isOpen
@@ -161,20 +178,8 @@ export default function Navbar() {
                     {/* User identity */}
                     <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
                       <p className="text-sm font-semibold text-foreground">
-                        {isOwnerOfCurrentBracket ? '👑 ' : ''}{user?.displayName || displayName}
+                        {(user?.icon || '😊') + ' '}{user?.displayName || displayName}
                       </p>
-                    </div>
-
-                    {/* All Brackets */}
-                    <div className="px-2 py-2 border-b border-gray-100 dark:border-gray-800">
-                      <Link
-                        href="/"
-                        onClick={closeMenu}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                      >
-                        <span>🏠</span>
-                        <span>All Brackets</span>
-                      </Link>
                     </div>
 
                     {/* Profile (all users) */}
@@ -192,6 +197,33 @@ export default function Navbar() {
                         </svg>
                       </button>
                     </div>
+
+                    {/* Names & Pick Round Winners (owners only) */}
+                    {isOwnerOfCurrentBracket && ownerLinks.length > 0 && (
+                      <div className="px-2 py-1 border-b border-gray-100 dark:border-gray-800">
+                        {ownerLinks.map(link => (
+                          <Link
+                            key={link.href}
+                            href={link.href}
+                            onClick={closeMenu}
+                            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                              pathname === link.href ? 'bg-gray-50 dark:bg-gray-800' : ''
+                            }`}
+                          >
+                            <span className="text-xl leading-none">{link.icon}</span>
+                            <div>
+                              <p className={`font-semibold ${pathname === link.href ? 'text-foreground' : 'text-gray-700 dark:text-gray-200'}`}>
+                                {link.label}
+                              </p>
+                              <p className="text-xs text-gray-400 dark:text-gray-500">{link.description}</p>
+                            </div>
+                            {pathname === link.href && (
+                              <span className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-600" />
+                            )}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Settings (owners only) */}
                     {isOwnerOfCurrentBracket && (
@@ -244,27 +276,6 @@ export default function Navbar() {
                       </p>
                     </div>
                     <div className="py-1">
-                      {ownerLinks.map(link => (
-                        <Link
-                          key={link.href}
-                          href={link.href}
-                          onClick={closeMenu}
-                          className={`flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
-                            pathname === link.href ? 'bg-gray-50 dark:bg-gray-800' : ''
-                          }`}
-                        >
-                          <span className="text-xl leading-none">{link.icon}</span>
-                          <div>
-                            <p className={`font-semibold ${pathname === link.href ? 'text-foreground' : 'text-gray-700 dark:text-gray-200'}`}>
-                              {link.label}
-                            </p>
-                            <p className="text-xs text-gray-400 dark:text-gray-500">{link.description}</p>
-                          </div>
-                          {pathname === link.href && (
-                            <span className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-600" />
-                          )}
-                        </Link>
-                      ))}
                       {currentBracketId && (
                         <button
                           onClick={() => { closeMenu(); setShowInviteModal(true); }}
@@ -278,6 +289,39 @@ export default function Navbar() {
                         </button>
                       )}
                     </div>
+                    {ownerRole === 'owner1' && currentBracket && (() => {
+                      const ROUND_ORDER_NAV = ['roundOf32', 'roundOf16', 'elite8', 'final4', 'championship'];
+                      const roundsAdvancedCount = ROUND_ORDER_NAV.filter(rk =>
+                        (currentBracket.matchups?.[rk] || []).some(m => m.winnerId)
+                      ).length;
+                      return (
+                        <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800">
+                          <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+                            Bracket Health
+                          </p>
+                          <dl className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
+                            <div className="flex justify-between">
+                              <dt>Status</dt>
+                              <dd className="font-semibold capitalize">{currentBracket.status}</dd>
+                            </div>
+                            <div className="flex justify-between">
+                              <dt>Current round</dt>
+                              <dd className="font-semibold">{currentBracket.currentRound || 'Round of 32'}</dd>
+                            </div>
+                            <div className="flex justify-between">
+                              <dt>Names filled</dt>
+                              <dd className="font-semibold">
+                                {(currentBracket.owner1Names?.length || 0) + (currentBracket.owner2Names?.length || 0)} / 32
+                              </dd>
+                            </div>
+                            <div className="flex justify-between">
+                              <dt>Rounds advanced</dt>
+                              <dd className="font-semibold">{roundsAdvancedCount}</dd>
+                            </div>
+                          </dl>
+                        </div>
+                      );
+                    })()}
                     {ownerRole === 'owner1' && (
                       <div className="px-4 py-3 border-t border-red-100 dark:border-red-900/40">
                         <p className="text-[11px] font-bold uppercase tracking-widest text-red-400 mb-3">
@@ -330,6 +374,8 @@ export default function Navbar() {
                         Back
                       </button>
                     </div>
+
+                    {/* Navigation buttons */}
                     <div className="py-1">
                       <button
                         onClick={() => navigate('/')}
@@ -347,6 +393,34 @@ export default function Navbar() {
                         </svg>
                         Update Information
                       </button>
+                    </div>
+
+                    {/* Icon picker */}
+                    <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800">
+                      <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+                        Choose your icon
+                      </p>
+                      <div className="grid grid-cols-5 gap-1">
+                        {PICKER_ICONS.map((emoji) => {
+                          const isSelected = (user?.icon || '👤') === emoji;
+                          return (
+                            <button
+                              key={emoji}
+                              onClick={() => handleIconSelect(emoji)}
+                              disabled={iconSaving}
+                              aria-label={`Select icon ${emoji}`}
+                              aria-pressed={isSelected}
+                              className={`flex items-center justify-center rounded-lg p-2 text-xl transition-colors ${
+                                isSelected
+                                  ? 'bg-indigo-100 ring-2 ring-indigo-400 dark:bg-indigo-900/40'
+                                  : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                              } ${iconSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                              {emoji}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </>
                 )}
@@ -376,7 +450,7 @@ export default function Navbar() {
       {showRemoveOwner2Modal && (
         <ConfirmModal
           title="Remove Owner 2"
-          message="This clears all Owner 2 names, resets shared-name flags, and reverts the bracket to draft with no matchups."
+          message="This permanently removes Owner 2, deletes all pick brackets (Owner 1, Owner 2, and all guests), removes all guest participants, and resets the bracket to draft. Only Owner 1's submitted names are kept. This cannot be undone."
           confirmLabel="Yes, Remove"
           onConfirm={async () => { await handleRemoveOwner2(); setShowRemoveOwner2Modal(false); }}
           onCancel={() => setShowRemoveOwner2Modal(false)}

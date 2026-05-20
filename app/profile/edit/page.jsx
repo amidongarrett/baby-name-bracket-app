@@ -5,11 +5,14 @@ import Link from 'next/link';
 import { useUser } from '@/contexts/UserContext';
 import { updateProfile, verifyEmailChange } from '@/lib/authApi';
 
+const ICON_OPTIONS = ['👤','👨','👩','🐼','🦁','🐶','🐨','🦊','🐸','🐯','🦄','🐻','🐮'];
+
 export default function ProfileEditPage() {
   const { user, token, updateUser } = useUser();
 
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
+  const [icon, setIcon] = useState('👤');
   const [step, setStep] = useState('form'); // 'form' | 'verify-email'
   const [pendingEmail, setPendingEmail] = useState('');
   const [code, setCode] = useState('');
@@ -22,6 +25,7 @@ export default function ProfileEditPage() {
     if (user) {
       setDisplayName(user.displayName || '');
       setEmail(user.email || '');
+      setIcon(user.icon || '👤');
     }
   }, [user]);
 
@@ -41,14 +45,14 @@ export default function ProfileEditPage() {
     }
 
     // Nothing changed
-    if (displayName.trim() === user?.displayName && email.trim().toLowerCase() === user?.email) {
+    if (displayName.trim() === user?.displayName && email.trim().toLowerCase() === user?.email && icon === (user?.icon || '👤')) {
       setError('No changes detected.');
       return;
     }
 
     setSubmitting(true);
     try {
-      const data = await updateProfile(displayName.trim(), email.trim().toLowerCase(), token);
+      const data = await updateProfile(displayName.trim(), email.trim().toLowerCase(), token, icon);
       if (data.requiresVerification) {
         setPendingEmail(email.trim().toLowerCase());
         setStep('verify-email');
@@ -110,6 +114,26 @@ export default function ProfileEditPage() {
                 onChange={e => setDisplayName(e.target.value)}
                 className={inputClass}
               />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-300">Choose your icon</label>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {ICON_OPTIONS.map(opt => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setIcon(opt)}
+                    className={`text-2xl rounded-lg p-1.5 border-2 transition-colors ${
+                      icon === opt
+                        ? 'border-indigo-500 bg-indigo-900/40'
+                        : 'border-gray-700 bg-gray-800 hover:border-gray-500'
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div>
