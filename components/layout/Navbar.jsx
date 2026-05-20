@@ -15,7 +15,7 @@ const PICKER_ICONS = ['👤','👨','👩','🐼','🦁','🐶','🐨','🦊','�
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
-  const [activePanel, setActivePanel] = useState('main'); // 'main' | 'settings' | 'profile'
+  const [activePanel, setActivePanel] = useState('main'); // 'main' | 'settings'
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showDeleteBracketModal, setShowDeleteBracketModal] = useState(false);
   const [showRemoveOwner2Modal, setShowRemoveOwner2Modal] = useState(false);
@@ -70,6 +70,7 @@ export default function Navbar() {
   ] : [];
 
   const showViewBracket = !!currentBracketId && pathname !== '/';
+  const isBracketViewPage = !!currentBracketId && pathname === `/bracket/${currentBracketId}`;
 
   function handleSignOut() {
     closeMenu();
@@ -136,10 +137,10 @@ export default function Navbar() {
           {/* Brand */}
           <Link
             href="/"
+            aria-label="Home"
             className="flex items-center gap-2 font-bold text-foreground transition-opacity hover:opacity-80"
           >
             <span className="text-xl">🏠</span>
-            <span className="text-lg">All Brackets</span>
           </Link>
 
           {/* Menu button — shows authenticated user's display name */}
@@ -177,218 +178,75 @@ export default function Navbar() {
                 {/* ── MAIN PANEL ─────────────────────────────────────────── */}
                 {activePanel === 'main' && (
                   <>
-                    {/* User identity — always first row */}
-                    <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+                    {/* User identity row — name + settings cog inline */}
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
                       <p className="text-base font-bold text-foreground">
                         {(user?.icon || '😊') + ' '}{user?.displayName || displayName || 'Guest'}
                       </p>
+                      {isOwnerOfCurrentBracket && (
+                        <button
+                          onClick={() => setActivePanel('settings')}
+                          aria-label="Open settings"
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200 transition-colors"
+                        >
+                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
 
-                    {/* View Bracket — shown on all bracket-scoped pages */}
-                    {showViewBracket && (
+                    {/* View Bracket — shown on bracket-scoped pages except the bracket view page itself */}
+                    {showViewBracket && !isBracketViewPage && (
                       <div className="px-2 py-1 border-b border-gray-100 dark:border-gray-800">
                         <Link
                           href={`/bracket/${currentBracketId}`}
                           onClick={closeMenu}
-                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
-                            pathname === `/bracket/${currentBracketId}` ? 'bg-gray-50 dark:bg-gray-800' : ''
-                          }`}
+                          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
                         >
                           <span className="text-xl leading-none">🏆</span>
                           <div>
-                            <p className={`font-semibold ${pathname === `/bracket/${currentBracketId}` ? 'text-foreground' : 'text-gray-700 dark:text-gray-200'}`}>
+                            <p className="font-semibold text-gray-700 dark:text-gray-200">
                               View Bracket
                             </p>
                             <p className="text-xs text-gray-400 dark:text-gray-500">See the current bracket view</p>
                           </div>
-                          {pathname === `/bracket/${currentBracketId}` && (
-                            <span className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-600" />
-                          )}
                         </Link>
                       </div>
                     )}
 
-                    {/* Profile (all users) */}
-                    <div className="px-2 py-1 border-b border-gray-100 dark:border-gray-800">
-                      <button
-                        onClick={() => setActivePanel('profile')}
-                        className="flex w-full items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                      >
-                        <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-                        </svg>
-                        <span>Profile</span>
-                        <svg className="ml-auto h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                        </svg>
-                      </button>
-                    </div>
-
                     {/* Names & Pick Round Winners (owners only) */}
                     {isOwnerOfCurrentBracket && ownerLinks.length > 0 && (
                       <div className="px-2 py-1 border-b border-gray-100 dark:border-gray-800">
-                        {ownerLinks.map(link => (
-                          <Link
-                            key={link.href}
-                            href={link.href}
-                            onClick={closeMenu}
-                            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
-                              pathname === link.href ? 'bg-gray-50 dark:bg-gray-800' : ''
-                            }`}
-                          >
-                            <span className="text-xl leading-none">{link.icon}</span>
-                            <div>
-                              <p className={`font-semibold ${pathname === link.href ? 'text-foreground' : 'text-gray-700 dark:text-gray-200'}`}>
-                                {link.label}
-                              </p>
-                              <p className="text-xs text-gray-400 dark:text-gray-500">{link.description}</p>
-                            </div>
-                            {pathname === link.href && (
-                              <span className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-600" />
-                            )}
-                          </Link>
-                        ))}
+                        {ownerLinks
+                          .filter(link => pathname !== link.href)
+                          .map(link => (
+                            <Link
+                              key={link.href}
+                              href={link.href}
+                              onClick={closeMenu}
+                              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+                            >
+                              <span className="text-xl leading-none">{link.icon}</span>
+                              <div>
+                                <p className="font-semibold text-gray-700 dark:text-gray-200">
+                                  {link.label}
+                                </p>
+                                <p className="text-xs text-gray-400 dark:text-gray-500">{link.description}</p>
+                              </div>
+                            </Link>
+                          ))}
                       </div>
                     )}
 
-                    {/* Settings (owners only) */}
-                    {isOwnerOfCurrentBracket && (
-                      <div className="px-2 py-1 border-b border-gray-100 dark:border-gray-800">
-                        <button
-                          onClick={() => setActivePanel('settings')}
-                          className="flex w-full items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                        >
-                          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                          </svg>
-                          <span>Settings</span>
-                          <svg className="ml-auto h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                          </svg>
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Sign out */}
-                    <div className="px-4 py-3">
-                      <button
-                        onClick={handleSignOut}
-                        className="w-full rounded-lg px-3 py-2 text-sm font-medium text-left text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                      >
-                        Sign out
-                      </button>
-                    </div>
                   </>
                 )}
 
                 {/* ── SETTINGS SUB-PANEL ─────────────────────────────────── */}
                 {activePanel === 'settings' && (
                   <>
-                    <div className="px-2 py-2 border-b border-gray-100 dark:border-gray-800">
-                      <button
-                        onClick={() => setActivePanel('main')}
-                        className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                      >
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-                        </svg>
-                        Back
-                      </button>
-                    </div>
-                    <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-800">
-                      <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">
-                        Settings
-                      </p>
-                    </div>
-                    <div className="py-1">
-                      {currentBracketId && (
-                        <button
-                          onClick={() => { closeMenu(); setShowInviteModal(true); }}
-                          className="flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
-                        >
-                          <span className="text-xl leading-none">✉️</span>
-                          <div>
-                            <p className="font-semibold text-gray-700 dark:text-gray-200">Invite People</p>
-                            <p className="text-xs text-gray-400 dark:text-gray-500">Send email invites or share a link</p>
-                          </div>
-                        </button>
-                      )}
-                    </div>
-                    {ownerRole === 'owner1' && currentBracket && (() => {
-                      const ROUND_ORDER_NAV = ['roundOf32', 'roundOf16', 'elite8', 'final4', 'championship'];
-                      const roundsAdvancedCount = ROUND_ORDER_NAV.filter(rk =>
-                        (currentBracket.matchups?.[rk] || []).some(m => m.winnerId)
-                      ).length;
-                      return (
-                        <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800">
-                          <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-2">
-                            Bracket Health
-                          </p>
-                          <dl className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
-                            <div className="flex justify-between">
-                              <dt>Status</dt>
-                              <dd className="font-semibold capitalize">{currentBracket.status}</dd>
-                            </div>
-                            <div className="flex justify-between">
-                              <dt>Current round</dt>
-                              <dd className="font-semibold">{currentBracket.currentRound || 'Round of 32'}</dd>
-                            </div>
-                            <div className="flex justify-between">
-                              <dt>Names filled</dt>
-                              <dd className="font-semibold">
-                                {(currentBracket.owner1Names?.length || 0) + (currentBracket.owner2Names?.length || 0)} / 32
-                              </dd>
-                            </div>
-                            <div className="flex justify-between">
-                              <dt>Rounds advanced</dt>
-                              <dd className="font-semibold">{roundsAdvancedCount}</dd>
-                            </div>
-                          </dl>
-                        </div>
-                      );
-                    })()}
-                    {ownerRole === 'owner1' && (
-                      <div className="px-4 py-3 border-t border-red-100 dark:border-red-900/40">
-                        <p className="text-[11px] font-bold uppercase tracking-widest text-red-400 mb-3">
-                          Danger Zone
-                        </p>
-                        <div className="flex flex-col gap-2">
-                          <button
-                            onClick={() => setShowResetModal(true)}
-                            className="w-full px-3 py-2 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 transition-colors text-left"
-                          >
-                            Reset &amp; Regenerate
-                          </button>
-                          {currentBracket?.status !== 'draft' && (
-                            <button
-                              onClick={() => setShowUnlockModal(true)}
-                              className="w-full px-3 py-2 bg-orange-600 text-white text-xs font-bold rounded hover:bg-orange-700 transition-colors text-left"
-                            >
-                              Unlock Names
-                            </button>
-                          )}
-                          <button
-                            onClick={() => setShowRemoveOwner2Modal(true)}
-                            className="w-full px-3 py-2 bg-amber-600 text-white text-xs font-bold rounded hover:bg-amber-700 transition-colors text-left"
-                          >
-                            Remove Owner 2
-                          </button>
-                          <button
-                            onClick={() => setShowDeleteBracketModal(true)}
-                            className="w-full px-3 py-2 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 transition-colors text-left"
-                          >
-                            Delete Bracket
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {/* ── PROFILE SUB-PANEL ──────────────────────────────────── */}
-                {activePanel === 'profile' && (
-                  <>
+                    {/* Back button */}
                     <div className="px-2 py-2 border-b border-gray-100 dark:border-gray-800">
                       <button
                         onClick={() => setActivePanel('main')}
@@ -401,15 +259,8 @@ export default function Navbar() {
                       </button>
                     </div>
 
-                    {/* Navigation buttons */}
+                    {/* Profile section — always first */}
                     <div className="py-1">
-                      <button
-                        onClick={() => navigate('/')}
-                        className="flex w-full items-center gap-2 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                      >
-                        <span>🏠</span>
-                        View Bracket Dashboard
-                      </button>
                       <button
                         onClick={() => navigate('/profile/edit')}
                         className="flex w-full items-center gap-2 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -448,8 +299,121 @@ export default function Navbar() {
                         })}
                       </div>
                     </div>
+
+                    {/* Settings label */}
+                    <div className="px-4 py-2 border-t border-gray-100 dark:border-gray-800">
+                      <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                        Settings
+                      </p>
+                    </div>
+
+                    {/* Invite People */}
+                    <div className="py-1">
+                      {currentBracketId && (
+                        <button
+                          onClick={() => { closeMenu(); setShowInviteModal(true); }}
+                          className="flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+                        >
+                          <span className="text-xl leading-none">✉️</span>
+                          <div>
+                            <p className="font-semibold text-gray-700 dark:text-gray-200">Invite People</p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500">Send email invites or share a link</p>
+                          </div>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Bracket Health (owner1 only) */}
+                    {ownerRole === 'owner1' && currentBracket && (() => {
+                      const ROUND_ORDER_NAV = ['roundOf32', 'roundOf16', 'elite8', 'final4', 'championship'];
+                      const roundsAdvancedCount = ROUND_ORDER_NAV.filter(rk =>
+                        (currentBracket.matchups?.[rk] || []).some(m => m.winnerId)
+                      ).length;
+                      return (
+                        <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800">
+                          <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+                            Bracket Health
+                          </p>
+                          <dl className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
+                            <div className="flex justify-between">
+                              <dt>Status</dt>
+                              <dd className="font-semibold capitalize">{currentBracket.status}</dd>
+                            </div>
+                            <div className="flex justify-between">
+                              <dt>Current round</dt>
+                              <dd className="font-semibold">{currentBracket.currentRound || 'Round of 32'}</dd>
+                            </div>
+                            <div className="flex justify-between">
+                              <dt>Names filled</dt>
+                              <dd className="font-semibold">
+                                {(currentBracket.owner1Names?.length || 0) + (currentBracket.owner2Names?.length || 0)} / 32
+                              </dd>
+                            </div>
+                            <div className="flex justify-between">
+                              <dt>Rounds advanced</dt>
+                              <dd className="font-semibold">{roundsAdvancedCount}</dd>
+                            </div>
+                          </dl>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Danger Zone (owner1 only) */}
+                    {ownerRole === 'owner1' && (
+                      <div className="px-4 py-3 border-t border-red-100 dark:border-red-900/40">
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-red-400 mb-3">
+                          Danger Zone
+                        </p>
+                        <div className="flex flex-col gap-2">
+                          <button
+                            onClick={() => setShowResetModal(true)}
+                            className="w-full px-3 py-2 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 transition-colors text-left"
+                          >
+                            Reset &amp; Regenerate
+                          </button>
+                          {currentBracket?.status !== 'draft' && (
+                            <button
+                              onClick={() => setShowUnlockModal(true)}
+                              className="w-full px-3 py-2 bg-orange-600 text-white text-xs font-bold rounded hover:bg-orange-700 transition-colors text-left"
+                            >
+                              Unlock Names
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setShowRemoveOwner2Modal(true)}
+                            className="w-full px-3 py-2 bg-amber-600 text-white text-xs font-bold rounded hover:bg-amber-700 transition-colors text-left"
+                          >
+                            Remove Owner 2
+                          </button>
+                          <button
+                            onClick={() => setShowDeleteBracketModal(true)}
+                            className="w-full px-3 py-2 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 transition-colors text-left"
+                          >
+                            Delete Bracket
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Bottom section — All Brackets + Sign Out */}
+                    <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 flex flex-col gap-1">
+                      <button
+                        onClick={() => navigate('/')}
+                        className="w-full rounded-lg px-3 py-2 text-sm font-medium text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
+                      >
+                        <span>🏠</span>
+                        All Brackets
+                      </button>
+                      <button
+                        onClick={handleSignOut}
+                        className="w-full rounded-lg px-3 py-2 text-sm font-medium text-left text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                      >
+                        Sign out
+                      </button>
+                    </div>
                   </>
                 )}
+
 
               </div>
             )}

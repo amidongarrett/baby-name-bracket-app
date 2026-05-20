@@ -2,7 +2,10 @@
 
 import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
+import { DragDropContext } from '@hello-pangea/dnd';
 import NameGenerator from '@/components/bracket/NameGenerator';
+import DraggableNameList from '@/components/bracket/DraggableNameList';
+import NameBankList from '@/components/bracket/NameBankList';
 import { useUser } from '@/contexts/UserContext';
 import { useBracket } from '@/contexts/BracketContext';
 
@@ -61,6 +64,10 @@ export default function BracketNamesPage({ params }) {
   const [owner1PendingNames, setOwner1PendingNames] = useState([]);
   const [owner2PendingNames, setOwner2PendingNames] = useState([]);
 
+  // Bank names (names beyond the 16-slot active list)
+  const [owner1BankNames, setOwner1BankNames] = useState([]);
+  const [owner2BankNames, setOwner2BankNames] = useState([]);
+
   const MAX_NAMES = 16;
 
   // Cleanup on unmount
@@ -116,11 +123,7 @@ export default function BracketNamesPage({ params }) {
       return;
     }
 
-    if (owner1Names.length >= MAX_NAMES) {
-      setOwner1Error(`You can only add up to ${MAX_NAMES} names!`);
-      return;
-    }
-
+    // No cap error — names beyond 16 go to the Name Bank silently
     setOwner1Error('');
   }, [owner1Input, owner1Names, sharedNames]);
 
@@ -146,11 +149,7 @@ export default function BracketNamesPage({ params }) {
       return;
     }
 
-    if (owner2Names.length >= MAX_NAMES) {
-      setOwner2Error(`You can only add up to ${MAX_NAMES} names!`);
-      return;
-    }
-
+    // No cap error — names beyond 16 go to the Name Bank silently
     setOwner2Error('');
   }, [owner2Input, owner2Names, sharedNames]);
 
@@ -168,14 +167,16 @@ export default function BracketNamesPage({ params }) {
             id: item.id,
             name: item.value,
             rank: index + 1,
-            isShared: item.isShared || false
+            isShared: item.isShared || false,
+            status: item.status || 'active',
           }));
 
           const owner2Data = (data.owner2Names || []).map((item, index) => ({
             id: item.id,
             name: item.value,
             rank: index + 1,
-            isShared: item.isShared || false
+            isShared: item.isShared || false,
+            status: item.status || 'active',
           }));
 
           const sharedData = (data.sharedNames || []).map((item, index) => ({
@@ -201,6 +202,9 @@ export default function BracketNamesPage({ params }) {
           }));
           setOwner1PendingNames(pending1Data);
           setOwner2PendingNames(pending2Data);
+
+          setOwner1BankNames((data.owner1BankNames || []).map(item => ({ id: item.id, name: item.value })));
+          setOwner2BankNames((data.owner2BankNames || []).map(item => ({ id: item.id, name: item.value })));
 
           setOwner1LockedIn(data.owner1LockedIn || false);
           setOwner2LockedIn(data.owner2LockedIn || false);
@@ -414,6 +418,109 @@ export default function BracketNamesPage({ params }) {
     }
   };
 
+  // Persist reordering to the API
+  const handleReorder = async (owner, activeNames, bankNames) => {
+    const updates = [
+      ...activeNames.map((n, i) => ({ id: n.id, rank: i + 1, status: 'active' })),
+      ...bankNames.map(n => ({ id: n.id, rank: null, status: 'bank' })),
+    ];
+    try {
+      const authToken = localStorage.getItem('authToken');
+      await fetch(`${BASE_URL}/api/brackets/${bracketId}/names/reorder`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ updates }),
+      });
+    } catch (err) {
+      console.error('Reorder failed, refreshing:', err);
+      await fetchBracketData();
+    }
+  };
+
+  const handleOwner1DragEnd = (result) => {
+    if (!result.destination) return;
+    const { source, destination } = result;
+
+    const isSourceActive = source.droppableId === 'owner1-active';
+    const isDestActive   = destination.droppableId === 'owner1-active';
+
+    let newActive = [...owner1Names];
+    let newBank   = [...owner1BankNames];
+
+    if (isSourceActive && isDestActive) {
+      // Reorder within active list
+      const [moved] = newActive.splice(source.index, 1);
+      newActive.splice(destination.index, 0, moved);
+    } else if (isSourceActive && !isDestActive) {
+      // Move active -> bank; backfill first bank name if available
+      const [moved] = newActive.splice(source.index, 1);
+      if (newBank.length > 0) {
+        const [promoted] = newBank.splice(0, 1);
+        newActive.splice(source.index, 0, promoted);
+        newBank.splice(destination.index, 0, moved);
+      } else {
+        newBank.splice(destination.index, 0, moved);
+      }
+    } else if (!isSourceActive && isDestActive) {
+      // Move bank -> active; displace last active to bank if at capacity
+      const [moved] = newBank.splice(source.index, 1);
+      if (newActive.length >= MAX_NAMES) {
+        const [displaced] = newActive.splice(MAX_NAMES - 1, 1);
+        newBank.push(displaced);
+      }
+      newActive.splice(destination.index, 0, moved);
+    } else {
+      // Reorder within bank
+      const [moved] = newBank.splice(source.index, 1);
+      newBank.splice(destination.index, 0, moved);
+    }
+
+    newActive = newActive.map((n, i) => ({ ...n, rank: i + 1 }));
+    setOwner1Names(newActive);
+    setOwner1BankNames(newBank);
+    handleReorder('Owner 1', newActive, newBank);
+  };
+
+  const handleOwner2DragEnd = (result) => {
+    if (!result.destination) return;
+    const { source, destination } = result;
+
+    const isSourceActive = source.droppableId === 'owner2-active';
+    const isDestActive   = destination.droppableId === 'owner2-active';
+
+    let newActive = [...owner2Names];
+    let newBank   = [...owner2BankNames];
+
+    if (isSourceActive && isDestActive) {
+      const [moved] = newActive.splice(source.index, 1);
+      newActive.splice(destination.index, 0, moved);
+    } else if (isSourceActive && !isDestActive) {
+      const [moved] = newActive.splice(source.index, 1);
+      if (newBank.length > 0) {
+        const [promoted] = newBank.splice(0, 1);
+        newActive.splice(source.index, 0, promoted);
+        newBank.splice(destination.index, 0, moved);
+      } else {
+        newBank.splice(destination.index, 0, moved);
+      }
+    } else if (!isSourceActive && isDestActive) {
+      const [moved] = newBank.splice(source.index, 1);
+      if (newActive.length >= MAX_NAMES) {
+        const [displaced] = newActive.splice(MAX_NAMES - 1, 1);
+        newBank.push(displaced);
+      }
+      newActive.splice(destination.index, 0, moved);
+    } else {
+      const [moved] = newBank.splice(source.index, 1);
+      newBank.splice(destination.index, 0, moved);
+    }
+
+    newActive = newActive.map((n, i) => ({ ...n, rank: i + 1 }));
+    setOwner2Names(newActive);
+    setOwner2BankNames(newBank);
+    handleReorder('Owner 2', newActive, newBank);
+  };
+
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
@@ -532,12 +639,12 @@ export default function BracketNamesPage({ params }) {
               </div>
             )}
 
-            {/* Names List (sorted by rank) */}
+            {/* Names List */}
             {(!isOwner2 || (owner1LockedIn && owner2LockedIn)) ? (
-              <div className="space-y-2">
+              <div>
                 {isOwner1 && owner1PendingNames.map(item => (
                   <div key={`owner1-pending-${item.id}`}
-                    className="flex items-center justify-between px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700">
+                    className="flex items-center justify-between px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 mb-2">
                     <div className="flex items-center gap-3">
                       <span className="text-xs font-bold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/40 px-2 py-1 rounded">
                         PENDING
@@ -556,64 +663,82 @@ export default function BracketNamesPage({ params }) {
                     )}
                   </div>
                 ))}
-                {owner1Names
-                  .sort((a, b) => getEffectiveRank(a, sharedNames) - getEffectiveRank(b, sharedNames))
-                  .map((item) => (
-                    <div
-                      key={`owner1-${item.name}`}
-                      className={`flex items-center justify-between px-3 py-2 rounded-lg ${
-                        item.isShared
-                          ? 'bg-purple-50 dark:bg-purple-900/30 border-2 border-purple-300 dark:border-purple-700'
-                          : 'bg-gray-50 dark:bg-gray-800'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className={`text-xs font-bold px-2 py-1 rounded ${
-                          item.isShared
-                            ? 'text-purple-600 dark:text-purple-400 bg-purple-200 dark:bg-purple-900/60'
-                            : 'text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700'
-                        }`}>
-                          #{getEffectiveRank(item, sharedNames)}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          {item.isShared && (
-                            <span className="text-purple-500" title="Shared Favorite">💜</span>
-                          )}
-                          <span className="text-foreground">{item.name}</span>
-                        </div>
-                      </div>
-                      {isOwner1 && !owner1LockedIn && (
-                        <button
-                          onClick={() => handleDeleteName(item.id)}
-                          className="text-red-500 hover:text-red-700 font-medium text-sm"
+
+                {/* Draggable active list (owner) or static list (observer) */}
+                {isOwner1 ? (
+                  <DragDropContext onDragEnd={handleOwner1DragEnd}>
+                    <DraggableNameList
+                      names={owner1Names.slice().sort((a, b) => getEffectiveRank(a, sharedNames) - getEffectiveRank(b, sharedNames))}
+                      droppableId="owner1-active"
+                      isOwner={true}
+                      isLocked={owner1LockedIn}
+                      onRemove={handleDeleteName}
+                      sharedNames={sharedNames}
+                    />
+                    <NameBankList
+                      bankNames={owner1BankNames}
+                      droppableId="owner1-bank"
+                      isOwner={true}
+                      isLocked={owner1LockedIn}
+                      onRemove={handleDeleteName}
+                    />
+                  </DragDropContext>
+                ) : (
+                  <div className="space-y-2">
+                    {owner1Names
+                      .sort((a, b) => getEffectiveRank(a, sharedNames) - getEffectiveRank(b, sharedNames))
+                      .map((item) => (
+                        <div
+                          key={`owner1-${item.name}`}
+                          className={`flex items-center justify-between px-3 py-2 rounded-lg ${
+                            item.isShared
+                              ? 'bg-purple-50 dark:bg-purple-900/30 border-2 border-purple-300 dark:border-purple-700'
+                              : 'bg-gray-50 dark:bg-gray-800'
+                          }`}
                         >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                          <div className="flex items-center gap-3">
+                            <span className={`text-xs font-bold px-2 py-1 rounded ${
+                              item.isShared
+                                ? 'text-purple-600 dark:text-purple-400 bg-purple-200 dark:bg-purple-900/60'
+                                : 'text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700'
+                            }`}>
+                              #{getEffectiveRank(item, sharedNames)}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              {item.isShared && (
+                                <span className="text-purple-500" title="Shared Favorite">💜</span>
+                              )}
+                              <span className="text-foreground">{item.name}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
 
                 {/* Shared names not owned by Owner 1 */}
-                {sharedNames
-                  .filter(shared => shared.addedBy === 'owner2')
-                  .map((item) => (
-                    <div
-                      key={`owner1-shared-${item.name}`}
-                      className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800/50 border border-dashed border-gray-300 dark:border-gray-700"
-                    >
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
-                            #{item.rank}
+                <div className="space-y-2 mt-2">
+                  {sharedNames
+                    .filter(shared => shared.addedBy === 'owner2')
+                    .map((item) => (
+                      <div
+                        key={`owner1-shared-${item.name}`}
+                        className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800/50 border border-dashed border-gray-300 dark:border-gray-700"
+                      >
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
+                              #{item.rank}
+                            </span>
+                            <span className="text-foreground/70">{item.name}</span>
+                          </div>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 italic ml-8">
+                            {`Shared name - on ${owner2DisplayName}'s list`}
                           </span>
-                          <span className="text-foreground/70">{item.name}</span>
                         </div>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 italic ml-8">
-                          {`Shared name - on ${owner2DisplayName}'s list`}
-                        </span>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                </div>
               </div>
             ) : (
               <p className="text-center text-gray-400 dark:text-gray-600 italic py-8">
@@ -765,12 +890,12 @@ export default function BracketNamesPage({ params }) {
                   </div>
                 )}
 
-                {/* Names List (sorted by rank) */}
+                {/* Names List */}
                 {(!isOwner1 || (owner1LockedIn && owner2LockedIn)) ? (
-                  <div className="space-y-2">
+                  <div>
                     {isOwner2 && owner2PendingNames.map(item => (
                       <div key={`owner2-pending-${item.id}`}
-                        className="flex items-center justify-between px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700">
+                        className="flex items-center justify-between px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 mb-2">
                         <div className="flex items-center gap-3">
                           <span className="text-xs font-bold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/40 px-2 py-1 rounded">
                             PENDING
@@ -789,64 +914,82 @@ export default function BracketNamesPage({ params }) {
                         )}
                       </div>
                     ))}
-                    {owner2Names
-                      .sort((a, b) => getEffectiveRank(a, sharedNames) - getEffectiveRank(b, sharedNames))
-                      .map((item) => (
-                        <div
-                          key={`owner2-${item.name}`}
-                          className={`flex items-center justify-between px-3 py-2 rounded-lg ${
-                            item.isShared
-                              ? 'bg-purple-50 dark:bg-purple-900/30 border-2 border-purple-300 dark:border-purple-700'
-                              : 'bg-gray-50 dark:bg-gray-800'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className={`text-xs font-bold px-2 py-1 rounded ${
-                              item.isShared
-                                ? 'text-purple-600 dark:text-purple-400 bg-purple-200 dark:bg-purple-900/60'
-                                : 'text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700'
-                            }`}>
-                              #{getEffectiveRank(item, sharedNames)}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              {item.isShared && (
-                                <span className="text-purple-500" title="Shared Favorite">💜</span>
-                              )}
-                              <span className="text-foreground">{item.name}</span>
-                            </div>
-                          </div>
-                          {isOwner2 && !owner2LockedIn && (
-                            <button
-                              onClick={() => handleDeleteName(item.id)}
-                              className="text-red-500 hover:text-red-700 font-medium text-sm"
+
+                    {/* Draggable active list (owner) or static list (observer) */}
+                    {isOwner2 ? (
+                      <DragDropContext onDragEnd={handleOwner2DragEnd}>
+                        <DraggableNameList
+                          names={owner2Names.slice().sort((a, b) => getEffectiveRank(a, sharedNames) - getEffectiveRank(b, sharedNames))}
+                          droppableId="owner2-active"
+                          isOwner={true}
+                          isLocked={owner2LockedIn}
+                          onRemove={handleDeleteName}
+                          sharedNames={sharedNames}
+                        />
+                        <NameBankList
+                          bankNames={owner2BankNames}
+                          droppableId="owner2-bank"
+                          isOwner={true}
+                          isLocked={owner2LockedIn}
+                          onRemove={handleDeleteName}
+                        />
+                      </DragDropContext>
+                    ) : (
+                      <div className="space-y-2">
+                        {owner2Names
+                          .sort((a, b) => getEffectiveRank(a, sharedNames) - getEffectiveRank(b, sharedNames))
+                          .map((item) => (
+                            <div
+                              key={`owner2-${item.name}`}
+                              className={`flex items-center justify-between px-3 py-2 rounded-lg ${
+                                item.isShared
+                                  ? 'bg-purple-50 dark:bg-purple-900/30 border-2 border-purple-300 dark:border-purple-700'
+                                  : 'bg-gray-50 dark:bg-gray-800'
+                              }`}
                             >
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      ))}
+                              <div className="flex items-center gap-3">
+                                <span className={`text-xs font-bold px-2 py-1 rounded ${
+                                  item.isShared
+                                    ? 'text-purple-600 dark:text-purple-400 bg-purple-200 dark:bg-purple-900/60'
+                                    : 'text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700'
+                                }`}>
+                                  #{getEffectiveRank(item, sharedNames)}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  {item.isShared && (
+                                    <span className="text-purple-500" title="Shared Favorite">💜</span>
+                                  )}
+                                  <span className="text-foreground">{item.name}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
 
                     {/* Shared names not owned by Owner 2 */}
-                    {sharedNames
-                      .filter(shared => shared.addedBy === 'owner1')
-                      .map((item) => (
-                        <div
-                          key={`owner2-shared-${item.name}`}
-                          className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800/50 border border-dashed border-gray-300 dark:border-gray-700"
-                        >
-                          <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
-                                #{item.rank}
+                    <div className="space-y-2 mt-2">
+                      {sharedNames
+                        .filter(shared => shared.addedBy === 'owner1')
+                        .map((item) => (
+                          <div
+                            key={`owner2-shared-${item.name}`}
+                            className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800/50 border border-dashed border-gray-300 dark:border-gray-700"
+                          >
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
+                                  #{item.rank}
+                                </span>
+                                <span className="text-foreground/70">{item.name}</span>
+                              </div>
+                              <span className="text-xs text-gray-500 dark:text-gray-400 italic ml-8">
+                                {`Shared name - on ${owner1DisplayName}'s list`}
                               </span>
-                              <span className="text-foreground/70">{item.name}</span>
                             </div>
-                            <span className="text-xs text-gray-500 dark:text-gray-400 italic ml-8">
-                              {`Shared name - on ${owner1DisplayName}'s list`}
-                            </span>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                    </div>
                   </div>
                 ) : (
                   <p className="text-center text-gray-400 dark:text-gray-600 italic py-8">

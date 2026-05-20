@@ -10,9 +10,6 @@ import ConfirmModal from '@/components/ui/ConfirmModal';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-const generateVoterId = () =>
-  'voter_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
-
 // Maps bracket.currentRound display labels → API round keys
 const ROUND_KEY_MAP = {
   'Round of 32':  'roundOf32',
@@ -27,13 +24,18 @@ export default function BracketIdPage({ params }) {
   const { id: bracketId } = use(params);
 
   // Role is sourced from UserContext (backed by localStorage under 'userType')
-  const { userType: viewerRole } = useUser();
+  const { userType: viewerRole, token, user, isOwner } = useUser();
   const { setCurrentBracket, isOwnerOfCurrentBracket } = useBracket();
+
+  // Returns fetch headers for my-bracket calls. Always send the Authorization header when a token is present.
+  const authHeaders = () =>
+    token
+      ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+      : { 'Content-Type': 'application/json' };
 
   const [bracket, setBracket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [voterId, setVoterId] = useState(null);
   const [previewMatchups, setPreviewMatchups] = useState([]);
   const [userBracket, setUserBracket] = useState(null);
   const [ownerPicks, setOwnerPicks] = useState({}); // { [matchupId]: { owner1NameId, owner2NameId } }
@@ -54,27 +56,14 @@ export default function BracketIdPage({ params }) {
     localStorage.setItem('bracketViewMode', mode);
   };
 
-  // Persist voterId in localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem('voterId');
-    if (stored) {
-      setVoterId(stored);
-    } else {
-      const newId = generateVoterId();
-      localStorage.setItem('voterId', newId);
-      setVoterId(newId);
-    }
-  }, []);
-
-  // Fetch this voter's UserBracket document
-  const fetchUserBracket = async (id) => {
-    if (!id) return;
+  // Fetch this voter's UserBracket document using the authenticated user's token.
+  const fetchUserBracket = async () => {
+    if (!token) return;
     try {
-      const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}/my-bracket?userId=${id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setUserBracket(data);
-      }
+      const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}/my-bracket`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setUserBracket(await res.json());
     } catch {}
   };
 
@@ -90,8 +79,8 @@ export default function BracketIdPage({ params }) {
   };
 
   useEffect(() => {
-    if (voterId) fetchUserBracket(voterId);
-  }, [voterId]);
+    if (token) fetchUserBracket();
+  }, [token, user?.id]);
 
   const fetchVoteTallies = async () => {
     try {
@@ -201,12 +190,12 @@ export default function BracketIdPage({ params }) {
     try {
       const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}/my-bracket/pick`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: voterId, round, position, selectedNameId }),
+        headers: authHeaders(),
+        body: JSON.stringify({ round, position, selectedNameId }),
       });
       if (res.ok) {
         setUserBracket(await res.json());
-        await fetchUserBracket(voterId);
+        await fetchUserBracket();
       }
     } catch (err) { console.error(err); }
     requestAnimationFrame(() => requestAnimationFrame(() =>
@@ -218,8 +207,8 @@ export default function BracketIdPage({ params }) {
     try {
       const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}/my-bracket/lock`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: voterId }),
+        headers: authHeaders(),
+        body: JSON.stringify({}),
       });
       if (res.ok) {
         const data = await res.json();
@@ -232,8 +221,8 @@ export default function BracketIdPage({ params }) {
     try {
       const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}/my-bracket/reset`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: voterId }),
+        headers: authHeaders(),
+        body: JSON.stringify({}),
       });
       if (res.ok) {
         const data = await res.json();
@@ -249,12 +238,10 @@ export default function BracketIdPage({ params }) {
       const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}/guest`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guestId: voterId }),
+        body: JSON.stringify({ guestId: user?.id }),
       });
       if (!res.ok) throw new Error('Failed to remove guest session');
       setUserBracket(null);
-      localStorage.removeItem('voterId');
-      setVoterId(null);
     } catch (err) {
       setError(err.message);
     }
@@ -424,7 +411,7 @@ export default function BracketIdPage({ params }) {
           <BracketListView
             matchups={matchupGrid}
             status={bracket.status}
-            voterId={voterId}
+            voterId={user?.id}
             userBracket={userBracket}
             viewerRole={viewerRole}
             ownerPicks={ownerPicks}
@@ -442,7 +429,7 @@ export default function BracketIdPage({ params }) {
           <BracketView
             matchups={matchupGrid}
             status={bracket.status}
-            voterId={voterId}
+            voterId={user?.id}
             userBracket={userBracket}
             viewerRole={viewerRole}
             ownerPicks={ownerPicks}
@@ -458,7 +445,7 @@ export default function BracketIdPage({ params }) {
       </div>
 
       {/* Guest — delete my participation */}
-      {!isOwnerOfCurrentBracket && viewerRole === 'guest' && voterId && (
+      {!isOwnerOfCurrentBracket && viewerRole === 'guest' && user?.id && (
         <div className="max-w-7xl mx-auto px-4 pb-6">
           <button
             onClick={() => setShowDeleteGuestModal(true)}
