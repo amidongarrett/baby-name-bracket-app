@@ -69,6 +69,8 @@ export default function Navbar() {
     { href: `/bracket/${currentBracketId}/pick-winner`, icon: '🏅', label: 'Pick Winner of Round', description: 'Agree on winners to advance'   },
   ] : [];
 
+  const showViewBracket = !!currentBracketId && pathname !== '/';
+
   function handleSignOut() {
     closeMenu();
     logout();
@@ -175,6 +177,30 @@ export default function Navbar() {
                 {/* ── MAIN PANEL ─────────────────────────────────────────── */}
                 {activePanel === 'main' && (
                   <>
+                    {/* View Bracket — shown on all bracket-scoped pages */}
+                    {showViewBracket && (
+                      <div className="px-2 py-1 border-b border-gray-100 dark:border-gray-800">
+                        <Link
+                          href={`/bracket/${currentBracketId}`}
+                          onClick={closeMenu}
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                            pathname === `/bracket/${currentBracketId}` ? 'bg-gray-50 dark:bg-gray-800' : ''
+                          }`}
+                        >
+                          <span className="text-xl leading-none">🏆</span>
+                          <div>
+                            <p className={`font-semibold ${pathname === `/bracket/${currentBracketId}` ? 'text-foreground' : 'text-gray-700 dark:text-gray-200'}`}>
+                              View Bracket
+                            </p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500">See the current bracket view</p>
+                          </div>
+                          {pathname === `/bracket/${currentBracketId}` && (
+                            <span className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-600" />
+                          )}
+                        </Link>
+                      </div>
+                    )}
+
                     {/* User identity */}
                     <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
                       <p className="text-sm font-semibold text-foreground">

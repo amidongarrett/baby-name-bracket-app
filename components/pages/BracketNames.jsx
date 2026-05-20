@@ -51,6 +51,12 @@ export default function BracketNamesPage({ params }) {
   const isOwner2 = ownerRole === 'owner2';
   const role = ownerRole === 'owner1' ? 'Owner 1' : ownerRole === 'owner2' ? 'Owner 2' : null;
 
+  // Owner 2 join status and invite card state
+  const [owner2UserId, setOwner2UserId] = useState(null);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteStatus, setInviteStatus] = useState('idle'); // 'idle' | 'sending' | 'sent' | 'error'
+  const [inviteError, setInviteError] = useState('');
+
   // Pending queues
   const [owner1PendingNames, setOwner1PendingNames] = useState([]);
   const [owner2PendingNames, setOwner2PendingNames] = useState([]);
@@ -155,6 +161,7 @@ export default function BracketNamesPage({ params }) {
       if (response.ok) {
         const data = await response.json();
         setCurrentBracket(data);
+        setOwner2UserId(data.owner2UserId || null);
 
         if (data.owner1Names || data.owner2Names || data.sharedNames) {
           const owner1Data = (data.owner1Names || []).map((item, index) => ({
@@ -374,6 +381,36 @@ export default function BracketNamesPage({ params }) {
       }
     } catch (error) {
       console.error('Error locking in:', error);
+    }
+  };
+
+  // Send (or re-send) the Owner 2 partner invite from the names page
+  const handleInviteOwner2 = async (e) => {
+    e.preventDefault();
+    const email = inviteEmail.trim();
+    if (!email) return;
+    setInviteStatus('sending');
+    setInviteError('');
+    try {
+      const authToken = localStorage.getItem('authToken');
+      const res = await fetch(`${BASE_URL}/api/brackets/${bracketId}/invite-owner2`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ email }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setInviteError(body.error || 'Failed to send invite');
+        setInviteStatus('error');
+        return;
+      }
+      setInviteStatus('sent');
+    } catch {
+      setInviteError('Failed to connect to server');
+      setInviteStatus('error');
     }
   };
 
@@ -642,144 +679,181 @@ export default function BracketNamesPage({ params }) {
               {owner2Names.length} / {MAX_NAMES} names
             </p>
 
-            {/* Input Form or Locked State */}
-            {!owner2LockedIn ? (
-              <>
-                <NameGenerator onGenerate={(name) => setOwner2Input(name)} />
-                <form onSubmit={handleAddOwner2} className="mb-4">
-                  <input
-                    type="text"
-                    value={owner2Input}
-                    onChange={(e) => setOwner2Input(e.target.value)}
-                    placeholder="Enter a baby name..."
-                    className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-800 text-foreground focus:outline-none focus:ring-2 ${
-                      owner2Error
-                        ? 'border-red-500 focus:ring-red-500'
-                        : 'border-gray-300 dark:border-gray-700 focus:ring-foreground'
-                    }`}
-                  />
-                  {owner2Error && (
-                    <p className="mt-2 text-sm text-red-600 dark:text-red-400">
-                      {owner2Error}
-                    </p>
-                  )}
-                  <button
-                    type="submit"
-                    disabled={!owner2Input.trim() || !!owner2Error}
-                    className="mt-3 w-full px-4 py-2 bg-foreground text-background rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Add Name
-                  </button>
-                </form>
-
-                {/* Lock In Button */}
-                <button
-                  onClick={() => handleLockIn('Owner 2')}
-                  disabled={owner2Names.length === 0}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-bold hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md mb-6"
-                >
-                  Lock In My Names
-                </button>
-              </>
-            ) : (
-              <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-600 rounded-lg">
-                <div className="flex items-center justify-center gap-2 text-green-700 dark:text-green-400">
-                  <span className="text-2xl">✅</span>
-                  <span className="font-bold text-lg">Names Locked In!</span>
-                </div>
-                <p className="text-center text-sm text-green-600 dark:text-green-500 mt-2">
-                  {owner1LockedIn ? 'Both parents ready! Bracket is active.' : `Waiting for ${owner1DisplayName} to lock in...`}
+            {isOwner1 && !owner2UserId ? (
+              /* Invite card — shown to Owner 1 only when no partner has joined yet */
+              <div className="flex flex-col items-center justify-center py-8 px-4 gap-4">
+                <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                  Your partner hasn't joined yet. Send them an invite to start adding names.
                 </p>
-              </div>
-            )}
-
-            {/* Names List (sorted by rank) */}
-            {(!isOwner1 || (owner1LockedIn && owner2LockedIn)) ? (
-              <div className="space-y-2">
-                {isOwner2 && owner2PendingNames.map(item => (
-                  <div key={`owner2-pending-${item.id}`}
-                    className="flex items-center justify-between px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700">
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/40 px-2 py-1 rounded">
-                        PENDING
-                      </span>
-                      <span
-                        className="text-red-700 dark:text-red-400 cursor-help"
-                        title="Name will be added when list falls below 16 names.">
-                        {item.name}
-                      </span>
-                    </div>
-                    {!owner2LockedIn && (
-                      <button onClick={() => handleRemovePending(item.id)}
-                        className="text-red-500 hover:text-red-700 font-medium text-sm">
-                        Remove
-                      </button>
-                    )}
+                {inviteStatus === 'sent' ? (
+                  <div className="w-full rounded-lg bg-green-50 dark:bg-green-900/30 px-4 py-3 text-sm font-medium text-green-700 dark:text-green-300 text-center">
+                    Invite sent!
                   </div>
-                ))}
-                {owner2Names
-                  .sort((a, b) => getEffectiveRank(a, sharedNames) - getEffectiveRank(b, sharedNames))
-                  .map((item) => (
-                    <div
-                      key={`owner2-${item.name}`}
-                      className={`flex items-center justify-between px-3 py-2 rounded-lg ${
-                        item.isShared
-                          ? 'bg-purple-50 dark:bg-purple-900/30 border-2 border-purple-300 dark:border-purple-700'
-                          : 'bg-gray-50 dark:bg-gray-800'
-                      }`}
+                ) : (
+                  <form onSubmit={handleInviteOwner2} className="w-full space-y-3">
+                    <input
+                      type="email"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      placeholder="Partner's email address"
+                      required
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    {inviteError && (
+                      <p className="text-sm text-red-600 dark:text-red-400">{inviteError}</p>
+                    )}
+                    <button
+                      type="submit"
+                      disabled={!inviteEmail.trim() || inviteStatus === 'sending'}
+                      className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
-                      <div className="flex items-center gap-3">
-                        <span className={`text-xs font-bold px-2 py-1 rounded ${
-                          item.isShared
-                            ? 'text-purple-600 dark:text-purple-400 bg-purple-200 dark:bg-purple-900/60'
-                            : 'text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700'
-                        }`}>
-                          #{getEffectiveRank(item, sharedNames)}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          {item.isShared && (
-                            <span className="text-purple-500" title="Shared Favorite">💜</span>
-                          )}
-                          <span className="text-foreground">{item.name}</span>
-                        </div>
-                      </div>
-                      {isOwner2 && !owner2LockedIn && (
-                        <button
-                          onClick={() => handleDeleteName(item.id)}
-                          className="text-red-500 hover:text-red-700 font-medium text-sm"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                  ))}
-
-                {/* Shared names not owned by Owner 2 */}
-                {sharedNames
-                  .filter(shared => shared.addedBy === 'owner1')
-                  .map((item) => (
-                    <div
-                      key={`owner2-shared-${item.name}`}
-                      className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800/50 border border-dashed border-gray-300 dark:border-gray-700"
-                    >
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
-                            #{item.rank}
-                          </span>
-                          <span className="text-foreground/70">{item.name}</span>
-                        </div>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 italic ml-8">
-                          {`Shared name - on ${owner1DisplayName}'s list`}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                      {inviteStatus === 'sending' ? 'Sending...' : 'Invite a Partner'}
+                    </button>
+                  </form>
+                )}
               </div>
             ) : (
-              <p className="text-center text-gray-400 dark:text-gray-600 italic py-8">
-                Hidden until both owners lock in.
-              </p>
+              <>
+                {/* Input Form or Locked State */}
+                {!owner2LockedIn ? (
+                  <>
+                    <NameGenerator onGenerate={(name) => setOwner2Input(name)} />
+                    <form onSubmit={handleAddOwner2} className="mb-4">
+                      <input
+                        type="text"
+                        value={owner2Input}
+                        onChange={(e) => setOwner2Input(e.target.value)}
+                        placeholder="Enter a baby name..."
+                        className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-800 text-foreground focus:outline-none focus:ring-2 ${
+                          owner2Error
+                            ? 'border-red-500 focus:ring-red-500'
+                            : 'border-gray-300 dark:border-gray-700 focus:ring-foreground'
+                        }`}
+                      />
+                      {owner2Error && (
+                        <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                          {owner2Error}
+                        </p>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={!owner2Input.trim() || !!owner2Error}
+                        className="mt-3 w-full px-4 py-2 bg-foreground text-background rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Add Name
+                      </button>
+                    </form>
+
+                    {/* Lock In Button */}
+                    <button
+                      onClick={() => handleLockIn('Owner 2')}
+                      disabled={owner2Names.length === 0}
+                      className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-bold hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md mb-6"
+                    >
+                      Lock In My Names
+                    </button>
+                  </>
+                ) : (
+                  <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-600 rounded-lg">
+                    <div className="flex items-center justify-center gap-2 text-green-700 dark:text-green-400">
+                      <span className="text-2xl">✅</span>
+                      <span className="font-bold text-lg">Names Locked In!</span>
+                    </div>
+                    <p className="text-center text-sm text-green-600 dark:text-green-500 mt-2">
+                      {owner1LockedIn ? 'Both parents ready! Bracket is active.' : `Waiting for ${owner1DisplayName} to lock in...`}
+                    </p>
+                  </div>
+                )}
+
+                {/* Names List (sorted by rank) */}
+                {(!isOwner1 || (owner1LockedIn && owner2LockedIn)) ? (
+                  <div className="space-y-2">
+                    {isOwner2 && owner2PendingNames.map(item => (
+                      <div key={`owner2-pending-${item.id}`}
+                        className="flex items-center justify-between px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-bold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/40 px-2 py-1 rounded">
+                            PENDING
+                          </span>
+                          <span
+                            className="text-red-700 dark:text-red-400 cursor-help"
+                            title="Name will be added when list falls below 16 names.">
+                            {item.name}
+                          </span>
+                        </div>
+                        {!owner2LockedIn && (
+                          <button onClick={() => handleRemovePending(item.id)}
+                            className="text-red-500 hover:text-red-700 font-medium text-sm">
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {owner2Names
+                      .sort((a, b) => getEffectiveRank(a, sharedNames) - getEffectiveRank(b, sharedNames))
+                      .map((item) => (
+                        <div
+                          key={`owner2-${item.name}`}
+                          className={`flex items-center justify-between px-3 py-2 rounded-lg ${
+                            item.isShared
+                              ? 'bg-purple-50 dark:bg-purple-900/30 border-2 border-purple-300 dark:border-purple-700'
+                              : 'bg-gray-50 dark:bg-gray-800'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={`text-xs font-bold px-2 py-1 rounded ${
+                              item.isShared
+                                ? 'text-purple-600 dark:text-purple-400 bg-purple-200 dark:bg-purple-900/60'
+                                : 'text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700'
+                            }`}>
+                              #{getEffectiveRank(item, sharedNames)}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              {item.isShared && (
+                                <span className="text-purple-500" title="Shared Favorite">💜</span>
+                              )}
+                              <span className="text-foreground">{item.name}</span>
+                            </div>
+                          </div>
+                          {isOwner2 && !owner2LockedIn && (
+                            <button
+                              onClick={() => handleDeleteName(item.id)}
+                              className="text-red-500 hover:text-red-700 font-medium text-sm"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      ))}
+
+                    {/* Shared names not owned by Owner 2 */}
+                    {sharedNames
+                      .filter(shared => shared.addedBy === 'owner1')
+                      .map((item) => (
+                        <div
+                          key={`owner2-shared-${item.name}`}
+                          className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800/50 border border-dashed border-gray-300 dark:border-gray-700"
+                        >
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
+                                #{item.rank}
+                              </span>
+                              <span className="text-foreground/70">{item.name}</span>
+                            </div>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 italic ml-8">
+                              {`Shared name - on ${owner1DisplayName}'s list`}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-gray-400 dark:text-gray-600 italic py-8">
+                    Hidden until both owners lock in.
+                  </p>
+                )}
+              </>
             )}
           </div>
         </div>
