@@ -65,6 +65,7 @@ export default function BracketView({
   publishedRounds = [],
   activeRoundKey = 'roundOf32',
   bracketMatchups = {}, nameMap = {},
+  voteTallies = null,
   onLockIn, onPick, onResetPicks = null,
 }) {
   // Split into owner1 (top 8) and owner2 (bottom 8) matchups.
@@ -387,6 +388,8 @@ export default function BracketView({
                             name2:   nameMap[activeMatchup.name2Id]?.value || leader2?.name || 'TBD',
                             name2Id: activeMatchup.name2Id || leader2?.nameId || null,
                             seed2:   activeMatchup.seed2 ?? leader2?.seed ?? null,
+                            votes1:  voteTallies?.roundOf16?.[i]?.name1Votes ?? activeMatchup.votes1,
+                            votes2:  voteTallies?.roundOf16?.[i]?.name2Votes ?? activeMatchup.votes2,
                           };
                           return (
                           <MatchupCard
@@ -479,6 +482,8 @@ export default function BracketView({
                             name2:   nameMap[activeMatchup.name2Id]?.value || leader2?.name || 'TBD',
                             name2Id: activeMatchup.name2Id || leader2?.nameId || null,
                             seed2:   activeMatchup.seed2 ?? leader2?.seed ?? null,
+                            votes1:  voteTallies?.elite8?.[i]?.name1Votes ?? activeMatchup.votes1,
+                            votes2:  voteTallies?.elite8?.[i]?.name2Votes ?? activeMatchup.votes2,
                           };
                           return (
                           <MatchupCard
@@ -572,6 +577,8 @@ export default function BracketView({
                       name2:   nameMap[f4Div1Matchup.name2Id]?.value || leader2?.name || 'TBD',
                       name2Id: f4Div1Matchup.name2Id || leader2?.nameId || null,
                       seed2:   f4Div1Matchup.seed2 ?? leader2?.seed ?? null,
+                      votes1:  voteTallies?.final4?.[0]?.name1Votes ?? f4Div1Matchup.votes1,
+                      votes2:  voteTallies?.final4?.[0]?.name2Votes ?? f4Div1Matchup.votes2,
                     };
                     return (
                       <div className="absolute w-full" style={{ top: `${F4_DIV1_TOP}px` }}>
@@ -580,13 +587,14 @@ export default function BracketView({
                           matchup={resolvedMatchup}
                           status={status}
                           index={0}
+                          round={4}
                           side="left"
                           slotHeight={F4_CARD_HEIGHT}
                           voterId={voterId}
                           viewerRole={viewerRole}
                           ownerPicks={ownerPicks}
                           isLocked={isLocked}
-                          isRoundPublished={isF4Published}
+                          isRoundPublished={activeRoundKey !== 'final4' && activeRoundKey !== 'championship' ? true : isF4Published}
                           name1Confirmed={name1Confirmed}
                           name2Confirmed={name2Confirmed}
                           userPickId={userBracket?.picks?.final4?.[0]}
@@ -656,6 +664,8 @@ export default function BracketView({
                       name2:   nameMap[champMatchup.name2Id]?.value || leader2?.name || 'TBD',
                       name2Id: champMatchup.name2Id || leader2?.nameId || null,
                       seed2:   champMatchup.seed2 ?? leader2?.seed ?? null,
+                      votes1:  voteTallies?.championship?.[0]?.name1Votes ?? champMatchup.votes1,
+                      votes2:  voteTallies?.championship?.[0]?.name2Votes ?? champMatchup.votes2,
                     };
                     return (
                       <div className="absolute w-full" style={{ top: `${TOTAL_HEIGHT / 2 - SLOT_HEIGHT / 2}px` }}>
@@ -664,13 +674,14 @@ export default function BracketView({
                           matchup={resolvedMatchup}
                           status={status}
                           index={0}
+                          round={5}
                           side="left"
                           slotHeight={F4_CARD_HEIGHT}
                           voterId={voterId}
                           viewerRole={viewerRole}
                           ownerPicks={ownerPicks}
                           isLocked={isLocked}
-                          isRoundPublished={isChampPublished}
+                          isRoundPublished={activeRoundKey !== 'championship' ? true : isChampPublished}
                           name1Confirmed={name1Confirmed}
                           name2Confirmed={name2Confirmed}
                           userPickId={userBracket?.picks?.championship?.[0]}
@@ -801,6 +812,8 @@ export default function BracketView({
                       name2:   nameMap[f4Div2Matchup.name2Id]?.value || leader2?.name || 'TBD',
                       name2Id: f4Div2Matchup.name2Id || leader2?.nameId || null,
                       seed2:   f4Div2Matchup.seed2 ?? leader2?.seed ?? null,
+                      votes1:  voteTallies?.final4?.[1]?.name1Votes ?? f4Div2Matchup.votes1,
+                      votes2:  voteTallies?.final4?.[1]?.name2Votes ?? f4Div2Matchup.votes2,
                     };
                     return (
                       <div className="absolute w-full" style={{ top: `${F4_DIV2_TOP}px` }}>
@@ -809,13 +822,14 @@ export default function BracketView({
                           matchup={resolvedMatchup}
                           status={status}
                           index={1}
+                          round={4}
                           side="right"
                           slotHeight={F4_CARD_HEIGHT}
                           voterId={voterId}
                           viewerRole={viewerRole}
                           ownerPicks={ownerPicks}
                           isLocked={isLocked}
-                          isRoundPublished={isF4Published}
+                          isRoundPublished={activeRoundKey !== 'final4' && activeRoundKey !== 'championship' ? true : isF4Published}
                           name1Confirmed={name1Confirmed}
                           name2Confirmed={name2Confirmed}
                           userPickId={userBracket?.picks?.final4?.[1]}
@@ -905,6 +919,8 @@ export default function BracketView({
                             name2:   nameMap[activeMatchup.name2Id]?.value || leader2?.name || 'TBD',
                             name2Id: activeMatchup.name2Id || leader2?.nameId || null,
                             seed2:   activeMatchup.seed2 ?? leader2?.seed ?? null,
+                            votes1:  voteTallies?.elite8?.[2 + i]?.name1Votes ?? activeMatchup.votes1,
+                            votes2:  voteTallies?.elite8?.[2 + i]?.name2Votes ?? activeMatchup.votes2,
                           };
                           return (
                           <MatchupCard
@@ -1002,6 +1018,8 @@ export default function BracketView({
                             name2:   nameMap[activeMatchup.name2Id]?.value || leader2?.name || 'TBD',
                             name2Id: activeMatchup.name2Id || leader2?.nameId || null,
                             seed2:   activeMatchup.seed2 ?? leader2?.seed ?? null,
+                            votes1:  voteTallies?.roundOf16?.[4 + i]?.name1Votes ?? activeMatchup.votes1,
+                            votes2:  voteTallies?.roundOf16?.[4 + i]?.name2Votes ?? activeMatchup.votes2,
                           };
                           return (
                           <MatchupCard

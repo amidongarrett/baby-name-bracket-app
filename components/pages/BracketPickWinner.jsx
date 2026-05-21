@@ -177,7 +177,6 @@ export default function BracketPickWinnerPage({ params }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          userId: user.id,
           round: currentRoundKey,
           position,
           selectedNameId,

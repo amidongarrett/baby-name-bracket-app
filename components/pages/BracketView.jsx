@@ -419,6 +419,7 @@ export default function BracketIdPage({ params }) {
             activeRoundKey={activeRoundKey}
             bracketMatchups={bracket?.matchups || {}}
             nameMap={nameMap}
+            voteTallies={voteTallies}
             onPick={handlePick}
             onLockIn={handleGuestLockIn}
             onResetPicks={handleResetPicks}
@@ -437,6 +438,7 @@ export default function BracketIdPage({ params }) {
             activeRoundKey={activeRoundKey}
             bracketMatchups={bracket?.matchups || {}}
             nameMap={nameMap}
+            voteTallies={voteTallies}
             onLockIn={handleGuestLockIn}
             onResetPicks={handleResetPicks}
             onPick={handlePick}

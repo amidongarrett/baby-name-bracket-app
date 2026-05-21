@@ -50,19 +50,24 @@ export default function DraggableNameList({
                 <div
                   ref={dragProvided.innerRef}
                   {...dragProvided.draggableProps}
+                  {...(isOwner && !isLocked ? dragProvided.dragHandleProps : {})}
+                  style={{
+                    ...(dragProvided.draggableProps.style || {}),
+                    ...(isOwner && !isLocked ? { touchAction: 'none' } : {}),
+                  }}
                   className={`flex items-center justify-between px-3 py-2 rounded-lg select-none ${
                     item.isShared
                       ? 'bg-purple-50 dark:bg-purple-900/30 border-2 border-purple-300 dark:border-purple-700'
                       : 'bg-gray-50 dark:bg-gray-800'
-                  } ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-blue-400' : ''}`}
+                  } ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-blue-400' : ''} ${isOwner && !isLocked ? 'cursor-grab active:cursor-grabbing' : ''}`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    {/* Drag handle — owner only */}
+                    {/* Drag handle icon — visual indicator only; drag events handled by outer div */}
                     {isOwner && !isLocked && (
                       <span
-                        {...dragProvided.dragHandleProps}
-                        className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing flex-shrink-0"
+                        className="text-gray-400 dark:text-gray-500 flex-shrink-0"
                         title="Drag to reorder"
+                        aria-hidden="true"
                       >
                         <svg width="12" height="20" viewBox="0 0 12 20" fill="currentColor">
                           <circle cx="4" cy="4" r="1.5" />

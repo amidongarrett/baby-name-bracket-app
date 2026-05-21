@@ -25,6 +25,7 @@ export default function BracketListView({
   activeRoundKey = 'roundOf32',
   bracketMatchups = {},
   nameMap = {},
+  voteTallies = null,
   onPick,
   onLockIn,
   onResetPicks = null,
@@ -99,6 +100,8 @@ export default function BracketListView({
           name2: n2?.value || (typeof m.name2 === 'string' ? m.name2 : null) || name2Obj?.value || 'TBD',
           name1Id: m.name1Id || name1Obj?.id || null,
           name2Id: m.name2Id || name2Obj?.id || null,
+          votes1: voteTallies?.[displayRoundKey]?.[i]?.name1Votes ?? m.votes1 ?? m.votes?.name1Votes ?? 0,
+          votes2: voteTallies?.[displayRoundKey]?.[i]?.name2Votes ?? m.votes2 ?? m.votes?.name2Votes ?? 0,
           winnerId: m.winnerId || null,
         };
       });
