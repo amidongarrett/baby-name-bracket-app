@@ -50,10 +50,10 @@ export default function DraggableNameList({
                 <div
                   ref={dragProvided.innerRef}
                   {...dragProvided.draggableProps}
-                  {...(isOwner && !isLocked ? dragProvided.dragHandleProps : {})}
+                  {...dragProvided.dragHandleProps}
                   style={{
                     ...(dragProvided.draggableProps.style || {}),
-                    ...(isOwner && !isLocked ? { touchAction: 'none' } : {}),
+                    touchAction: 'none',
                   }}
                   className={`flex items-center justify-between px-3 py-2 rounded-lg select-none ${
                     item.isShared

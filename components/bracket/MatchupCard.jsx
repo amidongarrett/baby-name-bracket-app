@@ -90,7 +90,7 @@ export default function MatchupCard({
   // Both name slots must be confirmed before voting is permitted on this card
   const canVote = status === 'active' && !effectiveWinnerId
     && name1Confirmed && name2Confirmed
-    && (isOwner ? true : !isLocked);
+    && !isLocked;
   const hasConflict = isOwner && owner1Pick && owner2Pick && owner1Pick !== owner2Pick;
   const dadVotedName1 = owner1Pick === name1Id;
   const dadVotedName2 = owner1Pick === name2Id;

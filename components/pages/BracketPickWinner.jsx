@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, useCallback, use } from 'react';
 import Link from 'next/link';
 import { useUser } from '@/contexts/UserContext';
 import { useBracket } from '@/contexts/BracketContext';
@@ -68,18 +68,23 @@ export default function BracketPickWinnerPage({ params }) {
 
   useEffect(() => { if (bracket) fetchVoteTallies(); }, [bracket?.currentRound]);
 
-  const fetchOwnerBrackets = async () => {
-    if (!bracketId || !bracket?.owner1UserId) return;
-    const headers = { Authorization: `Bearer ${token}` };
-    const [r1, r2] = await Promise.all([
-      fetch(`${BASE_URL}/api/bracket/${bracketId}/my-bracket?userId=${bracket.owner1UserId}`, { headers }),
-      fetch(`${BASE_URL}/api/bracket/${bracketId}/my-bracket?userId=${bracket.owner2UserId}`, { headers }),
-    ]);
-    if (r1.ok) setOwner1Bracket(await r1.json());
-    if (r2.ok) setOwner2Bracket(await r2.json());
-  };
+  const fetchOwnerBrackets = useCallback(async () => {
+    if (!bracketId || !token) return;
+    try {
+      const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}/owner-brackets`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOwner1Bracket(data.owner1Bracket || null);
+        setOwner2Bracket(data.owner2Bracket || null);
+      }
+    } catch (err) {
+      console.error('fetchOwnerBrackets error:', err);
+    }
+  }, [bracketId, token]);
 
-  useEffect(() => { fetchOwnerBrackets(); }, [bracket?.owner1UserId]);
+  useEffect(() => { fetchOwnerBrackets(); }, [bracketId, token, fetchOwnerBrackets]);
 
   // ── Real-time polling (active brackets only) ──────────────────────────────
   useEffect(() => {
