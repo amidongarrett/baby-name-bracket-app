@@ -21,6 +21,7 @@ export default function Navbar() {
   const [showRemoveOwner2Modal, setShowRemoveOwner2Modal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [showUnlockLockinModal, setShowUnlockLockinModal] = useState(false);
   const [dangerLoading, setDangerLoading] = useState(false);
   const [iconSaving, setIconSaving] = useState(false);
   const menuRef  = useRef(null);
@@ -110,6 +111,17 @@ export default function Navbar() {
   async function handleUnlockNames() {
     setDangerLoading(true);
     await fetch(`${BASE_URL}/api/admin/unlock-names`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ bracketId: currentBracketId }),
+    });
+    setDangerLoading(false);
+    window.location.reload();
+  }
+
+  async function handleUnlockLockin() {
+    setDangerLoading(true);
+    await fetch(`${BASE_URL}/api/admin/unlock-lockin`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ bracketId: currentBracketId }),
@@ -379,6 +391,14 @@ export default function Navbar() {
                               Unlock Names
                             </button>
                           )}
+                          {(currentBracket?.owner1LockedIn || currentBracket?.owner2LockedIn) && (
+                            <button
+                              onClick={() => setShowUnlockLockinModal(true)}
+                              className="w-full px-3 py-2 bg-yellow-600 text-white text-xs font-bold rounded hover:bg-yellow-700 transition-colors text-left"
+                            >
+                              Unlock Lock-In
+                            </button>
+                          )}
                           <button
                             onClick={() => setShowRemoveOwner2Modal(true)}
                             className="w-full px-3 py-2 bg-amber-600 text-white text-xs font-bold rounded hover:bg-amber-700 transition-colors text-left"
@@ -464,6 +484,16 @@ export default function Navbar() {
           confirmLabel="Yes, Unlock"
           onConfirm={async () => { await handleUnlockNames(); setShowUnlockModal(false); }}
           onCancel={() => setShowUnlockModal(false)}
+          loading={dangerLoading}
+        />
+      )}
+      {showUnlockLockinModal && (
+        <ConfirmModal
+          title="Unlock Lock-In?"
+          message="This resets both owners' lock-in state so names can be edited and re-submitted. Existing matchup stubs are cleared; all names and votes are left untouched. This cannot be undone."
+          confirmLabel="Yes, Unlock"
+          onConfirm={async () => { await handleUnlockLockin(); setShowUnlockLockinModal(false); }}
+          onCancel={() => setShowUnlockLockinModal(false)}
           loading={dangerLoading}
         />
       )}

@@ -69,6 +69,7 @@ export default function BracketView({
   onLockIn, onPick, onResetPicks = null,
   tiebreakerPrediction = null,
   onTiebreakerChange = null,
+  myScore = null,
 }) {
   // Split into owner1 (top 8) and owner2 (bottom 8) matchups.
   // In R32 mode matchupGrid has 16 entries. In later rounds it has fewer
@@ -563,6 +564,37 @@ export default function BracketView({
 
               {/* Inner region positioned relative to this spacer div below the header */}
               <div className="relative" style={{ height: `${TOTAL_HEIGHT}px` }}>
+
+                {/* Score panel — left of championship card, vertically centered */}
+                {viewerRole === 'guest' && (
+                  <div
+                    className="absolute text-center"
+                    style={{
+                      top: `${TOTAL_HEIGHT / 2}px`,
+                      right: 'calc(100% + 8px)',
+                      width: '140px',
+                      transform: 'translateY(-50%)',
+                    }}
+                  >
+                    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm px-4 py-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-2">Your Score</p>
+                      <div className="flex flex-col gap-1.5">
+                        <div>
+                          <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                            {myScore?.score ?? 0}
+                          </span>
+                          <span className="text-xs text-gray-500 ml-1">pts earned</span>
+                        </div>
+                        <div>
+                          <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">
+                            {myScore?.maxPossible ?? 62}
+                          </span>
+                          <span className="text-xs text-gray-500 ml-1">pts available</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* F4 Div1 card — top aligned with top Elite 8 card center (2*SLOT_HEIGHT = 260px) */}
                 {(() => {

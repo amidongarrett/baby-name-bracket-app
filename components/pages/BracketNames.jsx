@@ -233,6 +233,35 @@ export default function BracketNamesPage({ params }) {
     }
   }, [apiConnected]);
 
+  // Real-time polling on the names page (draft status only)
+  useEffect(() => {
+    if (!apiConnected || bracketStatus !== 'draft') return;
+
+    let intervalId;
+
+    const startPolling = () => {
+      intervalId = setInterval(fetchBracketData, 5000);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        clearInterval(intervalId);
+        intervalId = undefined;
+      } else {
+        fetchBracketData();
+        startPolling();
+      }
+    };
+
+    startPolling();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [apiConnected, bracketStatus]);
+
   // Handle adding name for Owner 1
   const handleAddOwner1 = async (e) => {
     e.preventDefault();
@@ -621,7 +650,8 @@ export default function BracketNamesPage({ params }) {
                 {/* Lock In Button */}
                 <button
                   onClick={() => handleLockIn('Owner 1')}
-                  disabled={owner1Names.length === 0}
+                  disabled={owner1Names.length < MAX_NAMES}
+                  title={owner1Names.length < MAX_NAMES ? `Add ${MAX_NAMES - owner1Names.length} more name(s) to lock in` : undefined}
                   className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-bold hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md mb-6"
                 >
                   Lock In My Names
@@ -872,7 +902,8 @@ export default function BracketNamesPage({ params }) {
                     {/* Lock In Button */}
                     <button
                       onClick={() => handleLockIn('Owner 2')}
-                      disabled={owner2Names.length === 0}
+                      disabled={owner2Names.length < MAX_NAMES}
+                      title={owner2Names.length < MAX_NAMES ? `Add ${MAX_NAMES - owner2Names.length} more name(s) to lock in` : undefined}
                       className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-bold hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md mb-6"
                     >
                       Lock In My Names

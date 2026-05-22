@@ -42,6 +42,7 @@ export default function BracketIdPage({ params }) {
   const [publishedRounds, setPublishedRounds] = useState([]); // rounds admin has published
   const [voteTallies, setVoteTallies] = useState(null);
   const [tiebreakerPrediction, setTiebreakerPrediction] = useState(null);
+  const [myScore, setMyScore] = useState(null); // { score, maxPossible }
   const [showDeleteGuestModal, setShowDeleteGuestModal] = useState(false);
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -89,6 +90,18 @@ export default function BracketIdPage({ params }) {
     if (token) fetchUserBracket();
   }, [token, user?.id]);
 
+  const fetchMyScore = async () => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}/scores`);
+      if (res.ok) {
+        const data = await res.json();
+        const entry = (data || []).find(e => e.userId === user?.id);
+        setMyScore(entry ? { score: entry.score, maxPossible: entry.maxPossible } : null);
+      }
+    } catch {}
+  };
+
   const fetchVoteTallies = async () => {
     try {
       const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}/vote-tallies`);
@@ -106,6 +119,7 @@ export default function BracketIdPage({ params }) {
   }, [viewerRole, bracket?.status]);
 
   useEffect(() => { if (bracket?.status === 'active') fetchVoteTallies(); }, [bracket?.currentRound]);
+  useEffect(() => { fetchMyScore(); }, [user?.id, userBracket?.lockedAt]);
 
   const fetchBracket = async () => {
     try {
@@ -465,6 +479,7 @@ export default function BracketIdPage({ params }) {
             onPick={handlePick}
             tiebreakerPrediction={tiebreakerPrediction}
             onTiebreakerChange={handleTiebreakerChange}
+            myScore={myScore}
           />
         )}
       </div>
