@@ -587,7 +587,7 @@ export default function BracketView({
                         </div>
                         <div>
                           <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">
-                            {myScore?.maxPossible ?? 62}
+                            {myScore?.maxPossible ?? 80}
                           </span>
                           <span className="text-xs text-gray-500 ml-1">pts available</span>
                         </div>
@@ -791,19 +791,55 @@ export default function BracketView({
                         </div>
                       </div>
                     )}
-                    {!isLocked && allPicksFilled && (
-                      <>
-                        <p className="text-xs text-gray-500 mb-2">
-                          All picks made! Lock in your bracket.
-                        </p>
-                        <button
-                          onClick={onLockIn}
-                          className="px-6 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-lg shadow hover:from-green-600 hover:to-emerald-600 transition-all text-sm"
-                        >
-                          Lock In My Bracket
-                        </button>
-                      </>
-                    )}
+                    {!isLocked && (() => {
+                      const currentRoundPicks = picks[activeRoundKey] || [];
+                      const currentRoundComplete = currentRoundPicks.filter(p => p !== null && p !== undefined).length >= matchups.length && matchups.length > 0;
+                      if (!currentRoundComplete) {
+                        return (
+                          <>
+                            <button
+                              disabled
+                              className="px-6 py-2.5 bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-bold rounded-lg text-sm cursor-not-allowed"
+                              title="Pick a winner for every matchup in this round to continue"
+                            >
+                              Lock In My Bracket
+                            </button>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              Pick a winner for every matchup in this round to continue
+                            </p>
+                          </>
+                        );
+                      }
+                      if (!allPicksFilled) {
+                        return (
+                          <>
+                            <button
+                              disabled
+                              className="px-6 py-2.5 bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-bold rounded-lg text-sm cursor-not-allowed"
+                              title="Complete all rounds to lock in"
+                            >
+                              Lock In My Bracket
+                            </button>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              Complete all rounds to lock in
+                            </p>
+                          </>
+                        );
+                      }
+                      return (
+                        <>
+                          <p className="text-xs text-gray-500 mb-2">
+                            All picks made! Lock in your bracket.
+                          </p>
+                          <button
+                            onClick={onLockIn}
+                            className="px-6 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-lg shadow hover:from-green-600 hover:to-emerald-600 transition-all text-sm"
+                          >
+                            Lock In My Bracket
+                          </button>
+                        </>
+                      );
+                    })()}
                     {!isLocked && totalFilledPicks === TOTAL_PICKS_REQUIRED && !tiebreakerSet && (
                       <p className="text-xs text-amber-600 dark:text-amber-400 text-center mt-2">
                         Enter your championship % prediction above to lock in.
