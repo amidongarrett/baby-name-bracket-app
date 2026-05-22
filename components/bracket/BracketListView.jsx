@@ -250,9 +250,18 @@ export default function BracketListView({
                   </button>
                 </>
               ) : (
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Complete all your picks to lock in.
-                </p>
+                <>
+                  <button
+                    disabled
+                    className="px-6 py-2.5 bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-bold rounded-lg text-sm cursor-not-allowed"
+                    title={`Pick a winner for all ${votableMatchups.length - votedCount} remaining matchup(s) in this round`}
+                  >
+                    Lock My Bracket
+                  </button>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {votedCount} / {votableMatchups.length} picks made this round
+                  </p>
+                </>
               )}
             </div>
           )}

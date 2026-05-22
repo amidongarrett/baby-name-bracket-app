@@ -121,9 +121,9 @@ export default function BracketIdPage({ params }) {
   useEffect(() => { if (bracket?.status === 'active') fetchVoteTallies(); }, [bracket?.currentRound]);
   useEffect(() => { fetchMyScore(); }, [user?.id, userBracket?.lockedAt]);
 
-  const fetchBracket = async () => {
+  const fetchBracket = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await fetch(`${BASE_URL}/api/bracket/${bracketId}`);
       if (!response.ok) throw new Error('Failed to fetch bracket');
       const data = await response.json();
@@ -134,7 +134,7 @@ export default function BracketIdPage({ params }) {
     } catch (err) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -299,6 +299,39 @@ export default function BracketIdPage({ params }) {
     fetchBracket();
     return () => setCurrentBracket(null);
   }, []);
+
+  // Real-time polling on bracket view (active brackets only)
+  useEffect(() => {
+    if (bracket?.status !== 'active') return;
+
+    let intervalId;
+
+    const poll = async () => {
+      await Promise.all([fetchBracket(true), fetchVoteTallies(), fetchOwnerPicks()]);
+    };
+
+    const startPolling = () => {
+      intervalId = setInterval(poll, 9000);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        clearInterval(intervalId);
+        intervalId = undefined;
+      } else {
+        poll();
+        startPolling();
+      }
+    };
+
+    startPolling();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [bracket?.status]);
 
   useEffect(() => {
     if (bracket?.status === 'draft') fetchPreviewMatchups();
