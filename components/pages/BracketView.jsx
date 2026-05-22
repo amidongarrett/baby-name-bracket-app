@@ -41,6 +41,7 @@ export default function BracketIdPage({ params }) {
   const [ownerPicks, setOwnerPicks] = useState({}); // { [matchupId]: { owner1NameId, owner2NameId } }
   const [publishedRounds, setPublishedRounds] = useState([]); // rounds admin has published
   const [voteTallies, setVoteTallies] = useState(null);
+  const [tiebreakerPrediction, setTiebreakerPrediction] = useState(null);
   const [showDeleteGuestModal, setShowDeleteGuestModal] = useState(false);
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -63,7 +64,13 @@ export default function BracketIdPage({ params }) {
       const res = await fetch(`${BASE_URL}/api/bracket/${bracketId}/my-bracket`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) setUserBracket(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setUserBracket(data);
+        if (data?.tiebreakerPrediction != null) {
+          setTiebreakerPrediction(data.tiebreakerPrediction);
+        }
+      }
     } catch {}
   };
 
@@ -230,6 +237,20 @@ export default function BracketIdPage({ params }) {
       }
     } catch (err) {
       console.error('Reset picks error:', err);
+    }
+  };
+
+  const handleTiebreakerChange = async (value) => {
+    setTiebreakerPrediction(value);
+    if (value === null || value === undefined) return;
+    try {
+      await fetch(`${BASE_URL}/api/bracket/${bracketId}/my-bracket/tiebreaker`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ prediction: value }),
+      });
+    } catch (err) {
+      console.error('tiebreaker save error:', err);
     }
   };
 
@@ -442,6 +463,8 @@ export default function BracketIdPage({ params }) {
             onLockIn={handleGuestLockIn}
             onResetPicks={handleResetPicks}
             onPick={handlePick}
+            tiebreakerPrediction={tiebreakerPrediction}
+            onTiebreakerChange={handleTiebreakerChange}
           />
         )}
       </div>

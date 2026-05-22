@@ -33,6 +33,11 @@ function BracketCard({ bracket }) {
             <span className="text-xs text-gray-500 dark:text-gray-400">{bracket.currentRound}</span>
           )}
         </div>
+        {(bracket.myScore !== undefined || bracket.myMaxPossible !== undefined) && (
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            {bracket.myScore ?? 0} pts &nbsp;·&nbsp; {bracket.myMaxPossible ?? 0} max possible
+          </span>
+        )}
       </div>
       <Link
         href={`/bracket/${bracket._id || bracket.id}`}

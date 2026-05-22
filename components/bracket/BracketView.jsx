@@ -67,6 +67,8 @@ export default function BracketView({
   bracketMatchups = {}, nameMap = {},
   voteTallies = null,
   onLockIn, onPick, onResetPicks = null,
+  tiebreakerPrediction = null,
+  onTiebreakerChange = null,
 }) {
   // Split into owner1 (top 8) and owner2 (bottom 8) matchups.
   // In R32 mode matchupGrid has 16 entries. In later rounds it has fewer
@@ -169,7 +171,10 @@ export default function BracketView({
   const totalFilledPicks = ['roundOf32', 'roundOf16', 'elite8', 'final4', 'championship']
     .flatMap(rk => picks[rk] || [])
     .filter(p => p !== null && p !== undefined).length;
-  const allPicksFilled = totalFilledPicks === TOTAL_PICKS_REQUIRED;
+  const tiebreakerSet = picks?.championship?.[0]
+    ? (tiebreakerPrediction !== null && tiebreakerPrediction !== undefined && tiebreakerPrediction !== '')
+    : true; // not required until championship pick is made
+  const allPicksFilled = totalFilledPicks === TOTAL_PICKS_REQUIRED && tiebreakerSet;
   const r32PickCount   = (picks.roundOf32 || []).filter(p => p !== null && p !== undefined).length;
   const totalPickCount = Object.values(picks).flat().filter(p => p !== null && p !== undefined).length;
   const canReset = !isLocked && totalPickCount > 0;
@@ -732,6 +737,28 @@ export default function BracketView({
                       transform: 'translateY(-50%)',
                     }}
                   >
+                    {picks?.championship?.[0] && !isLocked && (
+                      <div className="mt-3 flex flex-col items-center gap-1">
+                        <label className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                          Championship vote % for your pick
+                        </label>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={tiebreakerPrediction ?? ''}
+                            onChange={(e) => {
+                              const v = e.target.value === '' ? null : Math.max(0, Math.min(100, Number(e.target.value)));
+                              onTiebreakerChange?.(v);
+                            }}
+                            placeholder="e.g. 65"
+                            className="w-20 text-center border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm bg-white dark:bg-gray-800"
+                          />
+                          <span className="text-sm text-gray-500">%</span>
+                        </div>
+                      </div>
+                    )}
                     {!isLocked && allPicksFilled && (
                       <>
                         <p className="text-xs text-gray-500 mb-2">
@@ -744,6 +771,11 @@ export default function BracketView({
                           Lock In My Bracket
                         </button>
                       </>
+                    )}
+                    {!isLocked && totalFilledPicks === TOTAL_PICKS_REQUIRED && !tiebreakerSet && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 text-center mt-2">
+                        Enter your championship % prediction above to lock in.
+                      </p>
                     )}
                     {isLocked && (
                       <div>
