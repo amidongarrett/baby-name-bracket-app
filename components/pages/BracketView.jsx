@@ -127,7 +127,9 @@ export default function BracketIdPage({ params, shareToken = null }) {
     fetchOwnerPicks();
   }, [viewerRole, bracket?.status]);
 
-  useEffect(() => { if (bracket?.status === 'active') fetchVoteTallies(); }, [bracket?.currentRound]);
+  useEffect(() => {
+    if (bracket?.status === 'active' || bracket?.status === 'completed') fetchVoteTallies();
+  }, [bracket?.currentRound, bracket?.status]);
   useEffect(() => { fetchMyScore(); }, [user?.id, userBracket?.lockedAt]);
 
   const fetchBracket = async (silent = false) => {
@@ -383,6 +385,10 @@ export default function BracketIdPage({ params, shareToken = null }) {
     };
   };
 
+  const effectivePublishedRounds = bracket?.status === 'completed'
+    ? ['roundOf32', 'roundOf16', 'elite8', 'final4', 'championship']
+    : publishedRounds;
+
   const activeRoundKey = ROUND_KEY_MAP[bracket?.currentRound] || 'roundOf32';
 
   const currentRoundKey = bracket.currentRound === 'Completed'
@@ -487,7 +493,7 @@ export default function BracketIdPage({ params, shareToken = null }) {
             userBracket={userBracket}
             viewerRole={viewerRole}
             ownerPicks={ownerPicks}
-            publishedRounds={publishedRounds}
+            publishedRounds={effectivePublishedRounds}
             activeRoundKey={activeRoundKey}
             bracketMatchups={bracket?.matchups || {}}
             nameMap={nameMap}
@@ -506,7 +512,7 @@ export default function BracketIdPage({ params, shareToken = null }) {
             userBracket={userBracket}
             viewerRole={viewerRole}
             ownerPicks={ownerPicks}
-            publishedRounds={publishedRounds}
+            publishedRounds={effectivePublishedRounds}
             activeRoundKey={activeRoundKey}
             bracketMatchups={bracket?.matchups || {}}
             nameMap={nameMap}

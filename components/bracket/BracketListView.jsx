@@ -234,7 +234,7 @@ export default function BracketListView({
       {/* Round navigation row */}
       {RoundNavRow}
 
-      {isTournamentComplete ? (
+      {isTournamentComplete && (
         <div className="bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-950/30 dark:to-amber-950/30 rounded-2xl border-2 border-yellow-400 dark:border-yellow-700 p-6 text-center">
           <p className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-1">Tournament Complete</p>
           {championNameId && nameMap[championNameId] && (
@@ -243,122 +243,120 @@ export default function BracketListView({
             </p>
           )}
         </div>
-      ) : (
-        <>
-          {isRoundFuture && !(bracketMatchups[displayRoundKey]?.length) && displayMatchups.length > 0 && (
-            <p className="text-xs text-indigo-500 dark:text-indigo-400 text-center mt-1 mb-2 italic">
-              Your predicted matchups — based on your picks so far
+      )}
+
+      {isRoundFuture && !(bracketMatchups[displayRoundKey]?.length) && displayMatchups.length > 0 && (
+        <p className="text-xs text-indigo-500 dark:text-indigo-400 text-center mt-1 mb-2 italic">
+          Your predicted matchups — based on your picks so far
+        </p>
+      )}
+      {displayMatchups.map((matchup, index) => (
+        <ListMatchupCard
+          key={matchup._id || matchup.id || `list-${index}`}
+          matchup={matchup}
+          status={status}
+          index={index}
+          voterId={voterId}
+          userPickId={displayRoundPicks[index] || null}
+          isLocked={isLocked}
+          viewerRole={viewerRole}
+          ownerPicks={ownerPicks}
+          isRoundPublished={isRoundPast ? true : isRoundPublished}
+          activeRoundKey={displayRoundKey}
+          onPick={isRoundPast ? undefined : onPick}
+        />
+      ))}
+
+      {/* Guest: Lock My Bracket — only when tournament is active (not yet complete) and all picks made */}
+      {status === 'active' && viewerRole === 'guest' && !isTournamentComplete && !isLocked && (
+        <div className="mt-4 text-center">
+          {allPicksFilled ? (
+            <>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                All picks made! Lock in your bracket.
+              </p>
+              <button
+                onClick={onLockIn}
+                className="px-6 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-lg shadow hover:from-green-600 hover:to-emerald-600 transition-all text-sm"
+              >
+                Lock My Bracket
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                disabled
+                className="px-6 py-2.5 bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-bold rounded-lg text-sm cursor-not-allowed"
+                title={`Pick a winner for all ${votableMatchups.length - votedCount} remaining matchup(s) in this round`}
+              >
+                Lock My Bracket
+              </button>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {votedCount} / {votableMatchups.length} picks made this round
+              </p>
+            </>
+          )}
+        </div>
+      )}
+      {status === 'active' && viewerRole === 'guest' && !isTournamentComplete && isLocked && (
+        <div className="mt-4 text-center">
+          <span className="px-4 py-2 text-sm font-semibold text-green-700 bg-green-100 dark:bg-green-900/40 dark:text-green-400 rounded-lg border border-green-300 dark:border-green-700">
+            Bracket Locked In
+          </span>
+        </div>
+      )}
+      {status === 'active' && viewerRole === 'guest' && canReset && onResetPicks && (
+        <div className="mt-3 text-center">
+          {!showResetConfirm ? (
+            <button
+              onClick={() => setShowResetConfirm(true)}
+              className="px-4 py-1.5 text-xs font-semibold text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+            >
+              Reset Picks
+            </button>
+          ) : (
+            <div>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Clear all your picks?</p>
+              <div className="flex gap-2 justify-center">
+                <button
+                  onClick={() => { onResetPicks(); setShowResetConfirm(false); }}
+                  className="px-3 py-1 text-xs font-semibold bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                >
+                  Yes, reset
+                </button>
+                <button
+                  onClick={() => setShowResetConfirm(false)}
+                  className="px-3 py-1 text-xs font-semibold bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Owner1: Proceed to Next Round — only when tournament is active (not yet complete) and viewing active round */}
+      {status === 'active' && viewerRole === 'owner1' && nextRoundKey && displayRoundKey === activeRoundKey && !isTournamentComplete && (
+        <div className="mt-4 text-center">
+          {allMatchupsHaveWinners ? (
+            <button
+              onClick={handleProceedToNextRound}
+              disabled={proceedLoading}
+              className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold rounded-lg shadow hover:from-blue-600 hover:to-indigo-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+            >
+              {proceedLoading ? 'Advancing…' : `Proceed to ${nextRoundLabel}`}
+            </button>
+          ) : (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Waiting for winners to be set…
             </p>
           )}
-          {displayMatchups.map((matchup, index) => (
-            <ListMatchupCard
-              key={matchup._id || matchup.id || `list-${index}`}
-              matchup={matchup}
-              status={status}
-              index={index}
-              voterId={voterId}
-              userPickId={displayRoundPicks[index] || null}
-              isLocked={isLocked}
-              viewerRole={viewerRole}
-              ownerPicks={ownerPicks}
-              isRoundPublished={isRoundPast ? true : isRoundPublished}
-              activeRoundKey={displayRoundKey}
-              onPick={isRoundPast ? undefined : onPick}
-            />
-          ))}
-
-          {/* Guest: Lock My Bracket — only when tournament is active (not yet complete) and all picks made */}
-          {status === 'active' && viewerRole === 'guest' && !isTournamentComplete && !isLocked && (
-            <div className="mt-4 text-center">
-              {allPicksFilled ? (
-                <>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                    All picks made! Lock in your bracket.
-                  </p>
-                  <button
-                    onClick={onLockIn}
-                    className="px-6 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-lg shadow hover:from-green-600 hover:to-emerald-600 transition-all text-sm"
-                  >
-                    Lock My Bracket
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    disabled
-                    className="px-6 py-2.5 bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-bold rounded-lg text-sm cursor-not-allowed"
-                    title={`Pick a winner for all ${votableMatchups.length - votedCount} remaining matchup(s) in this round`}
-                  >
-                    Lock My Bracket
-                  </button>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {votedCount} / {votableMatchups.length} picks made this round
-                  </p>
-                </>
-              )}
-            </div>
-          )}
-          {status === 'active' && viewerRole === 'guest' && !isTournamentComplete && isLocked && (
-            <div className="mt-4 text-center">
-              <span className="px-4 py-2 text-sm font-semibold text-green-700 bg-green-100 dark:bg-green-900/40 dark:text-green-400 rounded-lg border border-green-300 dark:border-green-700">
-                Bracket Locked In
-              </span>
-            </div>
-          )}
-          {status === 'active' && viewerRole === 'guest' && canReset && onResetPicks && (
-            <div className="mt-3 text-center">
-              {!showResetConfirm ? (
-                <button
-                  onClick={() => setShowResetConfirm(true)}
-                  className="px-4 py-1.5 text-xs font-semibold text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
-                >
-                  Reset Picks
-                </button>
-              ) : (
-                <div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Clear all your picks?</p>
-                  <div className="flex gap-2 justify-center">
-                    <button
-                      onClick={() => { onResetPicks(); setShowResetConfirm(false); }}
-                      className="px-3 py-1 text-xs font-semibold bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-                    >
-                      Yes, reset
-                    </button>
-                    <button
-                      onClick={() => setShowResetConfirm(false)}
-                      className="px-3 py-1 text-xs font-semibold bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Owner1: Proceed to Next Round — only when viewing active round */}
-          {status === 'active' && viewerRole === 'owner1' && nextRoundKey && displayRoundKey === activeRoundKey && (
-            <div className="mt-4 text-center">
-              {allMatchupsHaveWinners ? (
-                <button
-                  onClick={handleProceedToNextRound}
-                  disabled={proceedLoading}
-                  className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold rounded-lg shadow hover:from-blue-600 hover:to-indigo-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-sm"
-                >
-                  {proceedLoading ? 'Advancing…' : `Proceed to ${nextRoundLabel}`}
-                </button>
-              ) : (
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Waiting for winners to be set…
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Bottom round navigation row — mirrors the top row */}
-          {RoundNavRow}
-        </>
+        </div>
       )}
+
+      {/* Bottom round navigation row — mirrors the top row */}
+      {RoundNavRow}
     </div>
   );
 }
