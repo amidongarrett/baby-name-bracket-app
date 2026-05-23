@@ -54,8 +54,8 @@ export default function ListMatchupCard({
   const winner2  = effectiveWinnerId && effectiveWinnerId === name2Id;
 
   // Real-time leading — owners only
-  const leading1 = isOwner && !effectiveWinnerId && votes1 > 0 && votes1 > votes2;
-  const leading2 = isOwner && !effectiveWinnerId && votes2 > 0 && votes2 > votes1;
+  const leading1 = (isOwner || isLocked) && !effectiveWinnerId && votes1 > 0 && votes1 > votes2;
+  const leading2 = (isOwner || isLocked) && !effectiveWinnerId && votes2 > 0 && votes2 > votes1;
 
   // Wrong pick visualization — owners never get "wrong pick" styling
   const guestWrongOnName1 = !isOwner && isRoundPublished && winner2 && votedForName1;
@@ -164,7 +164,7 @@ export default function ListMatchupCard({
             <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
               <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${percentage1}%` }} />
             </div>
-            <span className="text-[10px] text-gray-600 dark:text-gray-400 font-medium">
+            <span className={`text-[10px] font-medium ${leading1 ? 'text-green-600 dark:text-green-400 font-bold' : 'text-gray-600 dark:text-gray-400'}`}>
               {votes1} ({percentage1}%)
             </span>
           </div>
@@ -223,7 +223,7 @@ export default function ListMatchupCard({
             <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
               <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${percentage2}%` }} />
             </div>
-            <span className="text-[10px] text-gray-600 dark:text-gray-400 font-medium">
+            <span className={`text-[10px] font-medium ${leading2 ? 'text-green-600 dark:text-green-400 font-bold' : 'text-gray-600 dark:text-gray-400'}`}>
               {votes2} ({percentage2}%)
             </span>
           </div>
