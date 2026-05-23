@@ -24,6 +24,7 @@ export default function MatchupCard({
   name2FeederWrongPick = null,
   connectorSide = null,
   round = null,
+  ghostPicks = null,
 }) {
   const [isVoting, setIsVoting] = useState(false);
 
@@ -85,6 +86,10 @@ export default function MatchupCard({
   // Correct pick visualization — owners never get "correct pick" styling
   const guestCorrectOnName1 = !isOwner && isRoundPublished && winner1 && votedForName1;
   const guestCorrectOnName2 = !isOwner && isRoundPublished && winner2 && votedForName2;
+
+  // Ghost pick overlay — name the user predicted to appear here but was eliminated earlier
+  const name1Ghost = ghostPicks?.name1Ghost || null;
+  const name2Ghost = ghostPicks?.name2Ghost || null;
 
   // Owners can always re-vote (to resolve conflicts) until winner is set; guests until lock-in
   // Both name slots must be confirmed before voting is permitted on this card
@@ -175,7 +180,7 @@ export default function MatchupCard({
           guestWrong={guestWrongOnName1}
           otherName={name2}
           guestCorrect={guestCorrectOnName1}
-          feederWrongPick={name1FeederWrongPick}
+          feederWrongPick={name1Ghost ? { guestName: name1Ghost, actualName: name1 } : (name1FeederWrongPick || null)}
           votes={votes1}
           percentage={percentage1}
           showVoteBars={showVoteBars}
@@ -207,7 +212,7 @@ export default function MatchupCard({
           guestWrong={guestWrongOnName2}
           otherName={name1}
           guestCorrect={guestCorrectOnName2}
-          feederWrongPick={name2FeederWrongPick}
+          feederWrongPick={name2Ghost ? { guestName: name2Ghost, actualName: name2 } : (name2FeederWrongPick || null)}
           votes={votes2}
           percentage={percentage2}
           showVoteBars={showVoteBars}

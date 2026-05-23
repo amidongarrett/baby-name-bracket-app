@@ -9,6 +9,7 @@ export default function ListMatchupCard({
   viewerRole = 'guest', ownerPicks = {},
   isRoundPublished = false,
   activeRoundKey = 'roundOf32',
+  ghostPicks = null,
   onPick
 }) {
   const [isVoting, setIsVoting] = useState(false);
@@ -62,6 +63,10 @@ export default function ListMatchupCard({
   const guestWrongOnName2 = !isOwner && isRoundPublished && winner1 && votedForName2;
   const hasWrongPick = guestWrongOnName1 || guestWrongOnName2;
 
+  // Ghost pick overlay — name the user predicted to appear here but was eliminated earlier
+  const name1Ghost = ghostPicks?.name1Ghost || null;
+  const name2Ghost = ghostPicks?.name2Ghost || null;
+
   // Owners can always re-vote (to resolve conflicts) until winner is set; guests until lock-in
   const canVote = status === 'active' && !effectiveWinnerId && (
     isOwner ? true : !isLocked
@@ -112,6 +117,13 @@ export default function ListMatchupCard({
       {guestWrongOnName1 && (
         <div className="text-[9px] text-green-600 font-semibold px-2 pt-1">
           Actual: {name2}
+        </div>
+      )}
+      {name1Ghost && !guestWrongOnName1 && (
+        <div className="text-[9px] px-2 pt-1 text-gray-500">
+          You picked: <span className="line-through text-red-400">{name1Ghost}</span>
+          {' → '}
+          <span className="text-green-600 font-semibold">{name1}</span>
         </div>
       )}
       <div className={`px-2 py-1.5 border-b border-gray-200 dark:border-gray-700 ${row1Bg}`}>
@@ -175,6 +187,13 @@ export default function ListMatchupCard({
       {guestWrongOnName2 && (
         <div className="text-[9px] text-green-600 font-semibold px-2 pt-1">
           Actual: {name1}
+        </div>
+      )}
+      {name2Ghost && !guestWrongOnName2 && (
+        <div className="text-[9px] px-2 pt-1 text-gray-500">
+          You picked: <span className="line-through text-red-400">{name2Ghost}</span>
+          {' → '}
+          <span className="text-green-600 font-semibold">{name2}</span>
         </div>
       )}
       <div className={`px-2 py-1.5 ${row2Bg}`}>
