@@ -102,6 +102,14 @@ export default function ListMatchupCard({
     ? 'border-red-400 dark:border-red-500'
     : 'border-gray-300 dark:border-gray-700';
 
+  const voteText1Class = leading1
+    ? 'text-[10px] text-green-600 dark:text-green-400 font-medium'
+    : 'text-[10px] text-gray-600 dark:text-gray-400 font-medium';
+
+  const voteText2Class = leading2
+    ? 'text-[10px] text-green-600 dark:text-green-400 font-medium'
+    : 'text-[10px] text-gray-600 dark:text-gray-400 font-medium';
+
   return (
     <div className={`bg-white dark:bg-gray-900 rounded border shadow-sm overflow-hidden hover:shadow-md transition-shadow ${cardBorder}`}>
       <div className="bg-gray-50 dark:bg-gray-800 px-3 py-1 border-b border-gray-200 dark:border-gray-700">
@@ -164,7 +172,7 @@ export default function ListMatchupCard({
             <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
               <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${percentage1}%` }} />
             </div>
-            <span className="text-[10px] text-gray-600 dark:text-gray-400 font-medium">
+            <span className={voteText1Class}>
               {votes1} ({percentage1}%)
             </span>
           </div>
@@ -223,7 +231,7 @@ export default function ListMatchupCard({
             <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
               <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${percentage2}%` }} />
             </div>
-            <span className="text-[10px] text-gray-600 dark:text-gray-400 font-medium">
+            <span className={voteText2Class}>
               {votes2} ({percentage2}%)
             </span>
           </div>

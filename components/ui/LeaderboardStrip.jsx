@@ -70,7 +70,7 @@ export default function LeaderboardStrip({ bracketId, currentUserId }) {
 
   return (
     <div
-      className="overflow-hidden w-48"
+      className="overflow-x-hidden w-64"
       aria-label="Leaderboard preview"
       aria-live="polite"
     >
@@ -79,22 +79,22 @@ export default function LeaderboardStrip({ bracketId, currentUserId }) {
         style={phaseToAnimationStyle(phase)}
         className="flex items-center gap-1.5 min-w-0"
       >
-        <span className="text-xs font-bold text-gray-400 w-5 text-right shrink-0">
+        <span className="text-sm font-bold text-gray-400 w-6 text-right shrink-0">
           {entry.rankLabel}
         </span>
-        <span className="text-base leading-none shrink-0">{entry.icon || '👤'}</span>
-        <span className="text-xs font-medium text-gray-700 dark:text-gray-200 truncate flex-1 min-w-0">
+        <span className="text-lg shrink-0">{entry.icon || '👤'}</span>
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate flex-1 min-w-0">
           {entry.displayName}
           {isCurrentUser && (
-            <span className="ml-1 text-xs text-indigo-500 dark:text-indigo-400 font-semibold">
+            <span className="ml-1 text-sm text-indigo-500 dark:text-indigo-400 font-semibold">
               (you)
             </span>
           )}
         </span>
-        <span className="text-xs font-bold text-gray-800 dark:text-gray-100 shrink-0">
+        <span className="text-sm font-bold text-gray-800 dark:text-gray-100 shrink-0">
           {entry.score} pts
         </span>
-        <span className="text-xs text-gray-400 shrink-0">{entry.maxPossible} max</span>
+        <span className="text-sm text-gray-400 shrink-0">{entry.maxPossible} max</span>
       </div>
     </div>
   );

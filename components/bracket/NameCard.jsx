@@ -49,6 +49,10 @@ export default function NameCard({
   const isBottomRow = rowColor === 'purple';
   const borderClass = isBottomRow ? '' : 'border-b border-gray-200 dark:border-gray-700';
 
+  const voteTextClass = isLeading
+    ? 'text-[9px] text-green-600 dark:text-green-400 font-medium w-14 text-right tabular-nums'
+    : 'text-[9px] text-gray-400 dark:text-gray-500 font-medium w-14 text-right tabular-nums';
+
   return (
     <>
       {feederWrongPick && (
@@ -112,7 +116,7 @@ export default function NameCard({
                 style={{ width: `${percentage}%` }}
               />
             </div>
-            <span className="text-[9px] text-gray-400 dark:text-gray-500 font-medium w-14 text-right tabular-nums">
+            <span className={voteTextClass}>
               {`${votes} (${percentage}%)`}
             </span>
           </div>

@@ -405,7 +405,7 @@ export default function BracketIdPage({ params }) {
             </div>
 
             {/* Center: leaderboard strip */}
-            <div className="flex justify-center min-w-0 overflow-hidden">
+            <div className="flex justify-center min-w-0 overflow-x-hidden">
               {bracket.status !== 'draft' && (
                 <LeaderboardStrip bracketId={bracketId} currentUserId={user?.id} />
               )}
