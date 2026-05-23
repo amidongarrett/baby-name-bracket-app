@@ -369,7 +369,7 @@ export default function BracketPickWinnerPage({ params }) {
             unpicked: 'border-gray-200   dark:border-gray-700   bg-white     dark:bg-gray-900',
           }[status];
 
-          const renderNameOption = (nameId, nameValue, votes, pct, colorScheme) => {
+          const renderNameOption = (nameId, nameValue, votes, pct, colorScheme, isLeading) => {
             const isPickedByOwner1 = owner1Pick === nameId;
             const isPickedByOwner2 = owner2Pick === nameId;
             const isHighlighted    = isPickedByOwner1 || isPickedByOwner2;
@@ -388,7 +388,7 @@ export default function BracketPickWinnerPage({ params }) {
                 {/* Name + vote count */}
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-gray-900 dark:text-white">{nameValue}</span>
-                  <span className="text-xs font-bold text-gray-500 tabular-nums">
+                  <span className={`text-xs font-bold tabular-nums ${isLeading ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}`}>
                     {votes} vote{votes !== 1 ? 's' : ''} · {pct}%
                   </span>
                 </div>
@@ -446,7 +446,7 @@ export default function BracketPickWinnerPage({ params }) {
                 bg: 'bg-blue-50 dark:bg-blue-950/40',
                 bar: 'bg-blue-500',
                 hoverBorder: 'hover:border-blue-300 dark:hover:border-blue-600',
-              })}
+              }, matchup.votes1 > matchup.votes2)}
 
               <div className="text-center text-xs font-bold text-gray-300 dark:text-gray-600 my-2">VS</div>
 
@@ -455,7 +455,7 @@ export default function BracketPickWinnerPage({ params }) {
                 bg: 'bg-purple-50 dark:bg-purple-950/40',
                 bar: 'bg-purple-500',
                 hoverBorder: 'hover:border-purple-300 dark:hover:border-purple-600',
-              })}
+              }, matchup.votes2 > matchup.votes1)}
             </div>
           );
         })}
