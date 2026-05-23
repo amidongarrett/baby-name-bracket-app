@@ -17,7 +17,7 @@ function phaseToAnimationStyle(phase) {
   return {};
 }
 
-export default function LeaderboardStrip({ bracketId, currentUserId }) {
+export default function LeaderboardStrip({ bracketId, currentUserId, onSelectParticipant }) {
   const [entries, setEntries] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [phase, setPhase] = useState('idle'); // 'idle' | 'exit' | 'enter'
@@ -74,10 +74,13 @@ export default function LeaderboardStrip({ bracketId, currentUserId }) {
       aria-label="Leaderboard preview"
       aria-live="polite"
     >
-      <div
+      <button
         key={currentIndex}
         style={phaseToAnimationStyle(phase)}
-        className="flex items-center gap-1.5 min-w-0"
+        className="flex items-center gap-1.5 min-w-0 w-full text-left"
+        onClick={() => onSelectParticipant && onSelectParticipant(entry)}
+        type="button"
+        aria-label={`View ${entry.displayName}'s bracket`}
       >
         <span className="text-sm font-bold text-gray-400 w-6 text-right shrink-0">
           {entry.rankLabel}
@@ -95,7 +98,7 @@ export default function LeaderboardStrip({ bracketId, currentUserId }) {
           {entry.score} pts
         </span>
         <span className="text-sm text-gray-400 shrink-0">{entry.maxPossible} max</span>
-      </div>
+      </button>
     </div>
   );
 }
