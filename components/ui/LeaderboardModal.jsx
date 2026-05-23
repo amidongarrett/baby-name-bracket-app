@@ -16,6 +16,7 @@ export default function LeaderboardModal({
   voteTallies = null,
   publishedRounds = [],
   activeRoundKey = 'roundOf32',
+  bracketStatus,
   token,
 }) {
   const [mounted, setMounted] = useState(false);
@@ -136,6 +137,7 @@ export default function LeaderboardModal({
           voteTallies={voteTallies}
           publishedRounds={publishedRounds}
           activeRoundKey={activeRoundKey}
+          bracketStatus={bracketStatus}
           onClose={() => setViewingEntry(null)}
         />
       )}

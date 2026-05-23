@@ -485,6 +485,7 @@ export default function Navbar() {
             { 'Round of 32': 'roundOf32', 'Round of 16': 'roundOf16', 'Elite 8': 'elite8', 'Final 4': 'final4', 'Championship': 'championship' }[currentBracket?.currentRound]
             || (currentBracket?.status === 'completed' ? 'championship' : 'roundOf32')
           }
+          bracketStatus={currentBracket?.status}
           token={token}
         />
       )}
