@@ -114,11 +114,6 @@ export default function ListMatchupCard({
       </div>
 
       {/* Name 1 */}
-      {guestWrongOnName1 && (
-        <div className="text-[9px] text-green-600 font-semibold px-2 pt-1">
-          Actual: {name2}
-        </div>
-      )}
       {name1Ghost && !guestWrongOnName1 && (
         <div className="text-[9px] px-2 pt-1 text-gray-500">
           You picked: <span className="line-through text-red-400">{name1Ghost}</span>
@@ -134,8 +129,7 @@ export default function ListMatchupCard({
             </span>
             {winner1 && <span className="text-[10px]">&#127942;</span>}
             <span className={`text-xs font-medium truncate ${
-              guestWrongOnName1 ? 'line-through text-red-400 dark:text-red-500'
-              : winner1 ? 'text-green-800 dark:text-green-300 font-semibold'
+              winner1 ? 'text-green-800 dark:text-green-300 font-semibold'
               : winner2 ? 'text-gray-400 dark:text-gray-600'
               : placeholder1 ? 'text-gray-400 italic'
               : 'text-gray-900 dark:text-gray-100'
@@ -170,6 +164,9 @@ export default function ListMatchupCard({
                       </button>
                     )
           )}
+          {effectiveWinnerId && votedForName1 && (
+            <span className="ml-2 px-3 py-1 text-xs font-semibold text-blue-700 bg-blue-100 dark:bg-blue-900/40 dark:text-blue-400 rounded">Picked</span>
+          )}
         </div>
         {showVoteBars && (
           <div className={`flex items-center gap-2 ml-6 ${winner2 ? 'opacity-40' : ''}`}>
@@ -184,11 +181,6 @@ export default function ListMatchupCard({
       </div>
 
       {/* Name 2 */}
-      {guestWrongOnName2 && (
-        <div className="text-[9px] text-green-600 font-semibold px-2 pt-1">
-          Actual: {name1}
-        </div>
-      )}
       {name2Ghost && !guestWrongOnName2 && (
         <div className="text-[9px] px-2 pt-1 text-gray-500">
           You picked: <span className="line-through text-red-400">{name2Ghost}</span>
@@ -204,8 +196,7 @@ export default function ListMatchupCard({
             </span>
             {winner2 && <span className="text-[10px]">&#127942;</span>}
             <span className={`text-xs font-medium truncate ${
-              guestWrongOnName2 ? 'line-through text-red-400 dark:text-red-500'
-              : winner2 ? 'text-green-800 dark:text-green-300 font-semibold'
+              winner2 ? 'text-green-800 dark:text-green-300 font-semibold'
               : winner1 ? 'text-gray-400 dark:text-gray-600'
               : placeholder2 ? 'text-gray-400 italic'
               : 'text-gray-900 dark:text-gray-100'
@@ -235,6 +226,9 @@ export default function ListMatchupCard({
                       Vote
                     </button>
                   )
+          )}
+          {effectiveWinnerId && votedForName2 && (
+            <span className="ml-2 px-3 py-1 text-xs font-semibold text-blue-700 bg-blue-100 dark:bg-blue-900/40 dark:text-blue-400 rounded">Picked</span>
           )}
         </div>
         {showVoteBars && (
