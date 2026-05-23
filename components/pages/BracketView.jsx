@@ -20,7 +20,7 @@ const ROUND_KEY_MAP = {
   'Championship': 'championship',
 };
 
-export default function BracketIdPage({ params }) {
+export default function BracketIdPage({ params, shareToken = null }) {
   // Next.js 15 async params pattern
   const { id: bracketId } = use(params);
 
@@ -87,6 +87,18 @@ export default function BracketIdPage({ params }) {
     if (token) fetchUserBracket();
   }, [token, user?.id]);
 
+  // If the page was opened via a share-token invite link, register the user as a guest participant.
+  useEffect(() => {
+    if (!shareToken || !token || !bracketId) return;
+    fetch(`${BASE_URL}/api/bracket/${bracketId}/join-share`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ shareToken }),
+    }).then(res => {
+      if (res.ok) fetchUserBracket(); // refresh userBracket after join
+    }).catch(() => {});
+  }, [shareToken, token, bracketId]);
+
   const fetchMyScore = async () => {
     if (!user?.id) return;
     try {
@@ -115,7 +127,9 @@ export default function BracketIdPage({ params }) {
     fetchOwnerPicks();
   }, [viewerRole, bracket?.status]);
 
-  useEffect(() => { if (bracket?.status === 'active') fetchVoteTallies(); }, [bracket?.currentRound]);
+  useEffect(() => {
+    if (bracket?.status === 'active' || bracket?.status === 'completed') fetchVoteTallies();
+  }, [bracket?.currentRound, bracket?.status]);
   useEffect(() => { fetchMyScore(); }, [user?.id, userBracket?.lockedAt]);
 
   const fetchBracket = async (silent = false) => {
@@ -371,6 +385,10 @@ export default function BracketIdPage({ params }) {
     };
   };
 
+  const effectivePublishedRounds = bracket?.status === 'completed'
+    ? ['roundOf32', 'roundOf16', 'elite8', 'final4', 'championship']
+    : publishedRounds;
+
   const activeRoundKey = ROUND_KEY_MAP[bracket?.currentRound] || 'roundOf32';
 
   const currentRoundKey = bracket.currentRound === 'Completed'
@@ -475,7 +493,7 @@ export default function BracketIdPage({ params }) {
             userBracket={userBracket}
             viewerRole={viewerRole}
             ownerPicks={ownerPicks}
-            publishedRounds={publishedRounds}
+            publishedRounds={effectivePublishedRounds}
             activeRoundKey={activeRoundKey}
             bracketMatchups={bracket?.matchups || {}}
             nameMap={nameMap}
@@ -494,7 +512,7 @@ export default function BracketIdPage({ params }) {
             userBracket={userBracket}
             viewerRole={viewerRole}
             ownerPicks={ownerPicks}
-            publishedRounds={publishedRounds}
+            publishedRounds={effectivePublishedRounds}
             activeRoundKey={activeRoundKey}
             bracketMatchups={bracket?.matchups || {}}
             nameMap={nameMap}

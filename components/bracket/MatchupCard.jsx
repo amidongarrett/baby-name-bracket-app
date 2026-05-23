@@ -66,10 +66,10 @@ export default function MatchupCard({
   const votedForName1 = name1Id != null && userVotedNameId === name1Id;
   const votedForName2 = name2Id != null && userVotedNameId === name2Id;
 
-  const showVoteBars = status === 'active' && totalVotes > 0 && (isOwner || isLocked);
+  const showVoteBars = (status === 'active' || status === 'completed') && totalVotes > 0 && (isOwner || isLocked || status === 'completed');
 
   // Guests see winner highlights only after admin publishes the round
-  const effectiveWinnerId = (isOwner || isRoundPublished) ? (matchup.winnerId || null) : null;
+  const effectiveWinnerId = (isOwner || isRoundPublished || status === 'completed') ? (matchup.winnerId || null) : null;
   const winner1 = effectiveWinnerId && effectiveWinnerId === name1Id;
   const winner2 = effectiveWinnerId && effectiveWinnerId === name2Id;
 
