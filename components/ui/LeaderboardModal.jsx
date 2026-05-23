@@ -3,14 +3,26 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { rankEntries } from '@/utils/rankScores';
+import ParticipantBracketModal from '@/components/ui/ParticipantBracketModal';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-export default function LeaderboardModal({ bracketId, currentUserId, onClose }) {
+export default function LeaderboardModal({
+  bracketId,
+  currentUserId,
+  onClose,
+  bracketMatchups = {},
+  nameMap = {},
+  voteTallies = null,
+  publishedRounds = [],
+  activeRoundKey = 'roundOf32',
+  token,
+}) {
   const [mounted, setMounted] = useState(false);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [viewingEntry, setViewingEntry] = useState(null);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -73,28 +85,31 @@ export default function LeaderboardModal({ bracketId, currentUserId, onClose }) 
             {rankEntries(entries).map((entry) => {
               const isCurrentUser = entry.userId === currentUserId;
               return (
-                <li
-                  key={entry.userId}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg ${
-                    isCurrentUser
-                      ? 'bg-indigo-50 dark:bg-indigo-900/30 ring-1 ring-indigo-400'
-                      : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
-                  }`}
-                >
-                  <span className="text-xs font-bold text-gray-400 dark:text-gray-500 w-5 text-right shrink-0">
-                    {entry.rankLabel}
-                  </span>
-                  <span className="text-xl leading-none shrink-0">{entry.icon || '👤'}</span>
-                  <span className="flex-1 text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
-                    {entry.displayName}
-                    {isCurrentUser && (
-                      <span className="ml-1 text-xs text-indigo-500 dark:text-indigo-400 font-semibold">(you)</span>
-                    )}
-                  </span>
-                  <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-gray-800 dark:text-gray-100">{entry.score} pts</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">{entry.maxPossible} max</p>
-                  </div>
+                <li key={entry.userId}>
+                  <button
+                    type="button"
+                    onClick={() => setViewingEntry(entry)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                      isCurrentUser
+                        ? 'bg-indigo-50 dark:bg-indigo-900/30 ring-1 ring-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50'
+                        : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                    }`}
+                  >
+                    <span className="text-xs font-bold text-gray-400 dark:text-gray-500 w-5 text-right shrink-0">
+                      {entry.rankLabel}
+                    </span>
+                    <span className="text-xl leading-none shrink-0">{entry.icon || '👤'}</span>
+                    <span className="flex-1 text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
+                      {entry.displayName}
+                      {isCurrentUser && (
+                        <span className="ml-1 text-xs text-indigo-500 dark:text-indigo-400 font-semibold">(you)</span>
+                      )}
+                    </span>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-gray-800 dark:text-gray-100">{entry.score} pts</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">{entry.maxPossible} max</p>
+                    </div>
+                  </button>
                 </li>
               );
             })}
@@ -110,6 +125,20 @@ export default function LeaderboardModal({ bracketId, currentUserId, onClose }) 
           </button>
         </div>
       </div>
+
+      {viewingEntry && (
+        <ParticipantBracketModal
+          bracketId={bracketId}
+          targetEntry={viewingEntry}
+          token={token}
+          bracketMatchups={bracketMatchups}
+          nameMap={nameMap}
+          voteTallies={voteTallies}
+          publishedRounds={publishedRounds}
+          activeRoundKey={activeRoundKey}
+          onClose={() => setViewingEntry(null)}
+        />
+      )}
     </div>,
     document.body
   );

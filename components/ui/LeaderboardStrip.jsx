@@ -70,7 +70,7 @@ export default function LeaderboardStrip({ bracketId, currentUserId }) {
 
   return (
     <div
-      className="overflow-x-hidden w-64"
+      className="overflow-x-hidden w-full max-w-xs sm:max-w-sm"
       aria-label="Leaderboard preview"
       aria-live="polite"
     >

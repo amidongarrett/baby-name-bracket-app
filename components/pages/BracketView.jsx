@@ -416,21 +416,21 @@ export default function BracketIdPage({ params, shareToken = null }) {
       {/* Header */}
       <div className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-800">
         <div className="max-w-7xl mx-auto px-4 py-5">
-          <div className="grid grid-cols-3 items-center">
+          <div className="flex flex-col gap-2 md:grid md:grid-cols-3 md:items-center">
             {/* Left: title */}
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{bracketTitle}</h1>
+            <div className="flex justify-center md:justify-start">
+              <h1 className="text-sm font-semibold text-gray-500 dark:text-gray-400 md:text-3xl md:font-bold md:text-gray-900 md:dark:text-white text-center md:text-left">{bracketTitle}</h1>
             </div>
 
             {/* Center: leaderboard strip */}
-            <div className="flex justify-center min-w-0 overflow-x-hidden">
+            <div className="flex justify-start min-w-0 overflow-x-hidden w-full md:justify-center">
               {bracket.status !== 'draft' && (
                 <LeaderboardStrip bracketId={bracketId} currentUserId={user?.id} />
               )}
             </div>
 
             {/* Right: view toggle, right-aligned */}
-            <div className="flex justify-end">
+            <div className="flex justify-center md:justify-end">
               {bracket.status !== 'draft' && (
                 <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-sm font-medium">
                   <button
