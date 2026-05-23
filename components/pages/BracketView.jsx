@@ -8,6 +8,7 @@ import { useUser } from '@/contexts/UserContext';
 import { useBracket } from '@/contexts/BracketContext';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import LeaderboardStrip from '@/components/ui/LeaderboardStrip';
+import ParticipantBracketModal from '@/components/ui/ParticipantBracketModal';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -44,6 +45,7 @@ export default function BracketIdPage({ params, shareToken = null }) {
   const [voteTallies, setVoteTallies] = useState(null);
   const [myScore, setMyScore] = useState(null); // { score, maxPossible }
   const [showDeleteGuestModal, setShowDeleteGuestModal] = useState(false);
+  const [stripViewingEntry, setStripViewingEntry] = useState(null);
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('bracketViewMode');
@@ -425,7 +427,11 @@ export default function BracketIdPage({ params, shareToken = null }) {
             {/* Center: leaderboard strip */}
             <div className="flex justify-start min-w-0 overflow-x-hidden w-full md:justify-center">
               {bracket.status !== 'draft' && (
-                <LeaderboardStrip bracketId={bracketId} currentUserId={user?.id} />
+                <LeaderboardStrip
+                  bracketId={bracketId}
+                  currentUserId={user?.id}
+                  onSelectParticipant={(entry) => setStripViewingEntry(entry)}
+                />
               )}
             </div>
 
@@ -547,6 +553,20 @@ export default function BracketIdPage({ params, shareToken = null }) {
             />
           )}
         </div>
+      )}
+      {stripViewingEntry && (
+        <ParticipantBracketModal
+          bracketId={bracketId}
+          targetEntry={stripViewingEntry}
+          token={token}
+          bracketMatchups={bracket?.matchups || {}}
+          nameMap={nameMap}
+          voteTallies={voteTallies}
+          publishedRounds={effectivePublishedRounds}
+          activeRoundKey={activeRoundKey}
+          bracketStatus={bracket?.status}
+          onClose={() => setStripViewingEntry(null)}
+        />
       )}
     </div>
   );

@@ -173,15 +173,6 @@ export default function ParticipantBracketModal({
             List
           </button>
         </div>
-        <button
-          onClick={onClose}
-          aria-label="Close"
-          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200 transition-colors shrink-0"
-        >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
       </div>
 
       {/* Body */}
@@ -221,10 +212,11 @@ export default function ParticipantBracketModal({
               bracketMatchups={bracketMatchups}
               nameMap={nameMap}
               voteTallies={voteTallies}
+              myScore={{ score, maxPossible }}
             />
           ) : (
             <BracketListView
-              matchups={[]}
+              matchups={matchupGrid}
               status={bracketStatus || 'active'}
               voterId={targetEntry.userId}
               userBracket={participantBracket}
