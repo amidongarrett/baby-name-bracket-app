@@ -128,50 +128,64 @@ export default function ParticipantBracketModal({
   return createPortal(
     <div className="fixed inset-0 z-60 flex flex-col bg-white dark:bg-gray-950 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shrink-0">
-        <button
-          onClick={onClose}
-          aria-label="Back to leaderboard"
-          className="flex items-center gap-1.5 text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 transition-colors shrink-0"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-          </svg>
-          Leaderboard
-        </button>
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <span className="text-xl leading-none shrink-0">{icon}</span>
-          <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
-            {displayName}&apos;s Bracket
-          </span>
-          {!loading && !error && (
-            <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
-              {score} pts &middot; {maxPossible} max
-            </span>
-          )}
-        </div>
-        {/* Bug 1 fix: bracket / list view toggle */}
-        <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs font-medium shrink-0">
-          <button
-            onClick={() => setViewMode('bracket')}
-            className={`px-2.5 py-1.5 transition-colors ${
-              viewMode === 'bracket'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-            }`}
-          >
-            Bracket
-          </button>
-          <button
-            onClick={() => setViewMode('list')}
-            className={`px-2.5 py-1.5 transition-colors ${
-              viewMode === 'list'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-            }`}
-          >
-            List
-          </button>
+      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shrink-0">
+        <div className="px-4 py-5">
+          <div className="grid grid-cols-3 items-center">
+            {/* Left: back button */}
+            <div className="flex justify-start">
+              <button
+                onClick={onClose}
+                aria-label="Back to leaderboard"
+                className="flex items-center gap-1.5 text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 transition-colors"
+              >
+                <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                </svg>
+                Leaderboard
+              </button>
+            </div>
+
+            {/* Center: participant icon, name, score */}
+            <div className="flex flex-col items-center gap-0.5 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xl leading-none shrink-0">{icon}</span>
+                <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
+                  {displayName}
+                </span>
+              </div>
+              {!loading && !error && (
+                <span className="text-xs text-gray-400 dark:text-gray-500">
+                  {score} pts &middot; {maxPossible} max
+                </span>
+              )}
+            </div>
+
+            {/* Right: bracket / list view toggle */}
+            <div className="flex justify-end">
+              <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-sm font-medium">
+                <button
+                  onClick={() => setViewMode('bracket')}
+                  className={`px-3 py-1.5 transition-colors ${
+                    viewMode === 'bracket'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  Bracket
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`px-3 py-1.5 transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  List
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
