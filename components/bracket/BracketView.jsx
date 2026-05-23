@@ -432,6 +432,10 @@ export default function BracketView({
                               pickRoundKey="roundOf16"
                               pickPosition={i}
                               userPickId={picks.roundOf16?.[i] || null}
+                              voteTallies={voteTallies}
+                              tallyRoundKey="roundOf16"
+                              tallyIndex={i}
+                              isLocked={isLocked}
                             />
                           );
                         })()}
@@ -529,6 +533,10 @@ export default function BracketView({
                             pickRoundKey="elite8"
                             pickPosition={i}
                             userPickId={picks.elite8?.[i] || null}
+                            voteTallies={voteTallies}
+                            tallyRoundKey="elite8"
+                            tallyIndex={i}
+                            isLocked={isLocked}
                           />
                           );
                         })()}
@@ -662,6 +670,10 @@ export default function BracketView({
                             pickRoundKey="final4"
                             pickPosition={0}
                             userPickId={picks.final4?.[0] || null}
+                            voteTallies={voteTallies}
+                            tallyRoundKey="final4"
+                            tallyIndex={0}
+                            isLocked={isLocked}
                           />
                         );
                       })()}
@@ -746,6 +758,10 @@ export default function BracketView({
                             pickRoundKey="championship"
                             pickPosition={0}
                             userPickId={picks.championship?.[0] || null}
+                            voteTallies={voteTallies}
+                            tallyRoundKey="championship"
+                            tallyIndex={0}
+                            isLocked={isLocked}
                           />
                         );
                       })()}
@@ -933,6 +949,10 @@ export default function BracketView({
                             pickRoundKey="final4"
                             pickPosition={1}
                             userPickId={picks.final4?.[1] || null}
+                            voteTallies={voteTallies}
+                            tallyRoundKey="final4"
+                            tallyIndex={1}
+                            isLocked={isLocked}
                           />
                         );
                       })()}
@@ -1033,6 +1053,10 @@ export default function BracketView({
                             pickRoundKey="elite8"
                             pickPosition={2 + i}
                             userPickId={picks.elite8?.[2 + i] || null}
+                            voteTallies={voteTallies}
+                            tallyRoundKey="elite8"
+                            tallyIndex={2 + i}
+                            isLocked={isLocked}
                           />
                           );
                         })()}
@@ -1129,6 +1153,10 @@ export default function BracketView({
                               pickRoundKey="roundOf16"
                               pickPosition={4 + i}
                               userPickId={picks.roundOf16?.[4 + i] || null}
+                              voteTallies={voteTallies}
+                              tallyRoundKey="roundOf16"
+                              tallyIndex={4 + i}
+                              isLocked={isLocked}
                             />
                           );
                         })()}
@@ -1332,6 +1360,11 @@ function PlaceholderMatchup({
   pickRoundKey = null,
   pickPosition = null,
   userPickId = null,
+  // Vote bar props
+  voteTallies = null,
+  tallyRoundKey = null,
+  tallyIndex = 0,
+  isLocked = false,
 }) {
   // connectorSide overrides side for connector direction only — lets the right-side
   // Elite 8 column route connectors leftward toward the Final 4 column.
@@ -1360,6 +1393,14 @@ function PlaceholderMatchup({
       />
     );
   }
+
+  // Vote bar derivation
+  const votes1 = voteTallies?.[tallyRoundKey]?.[tallyIndex]?.name1Votes ?? 0;
+  const votes2 = voteTallies?.[tallyRoundKey]?.[tallyIndex]?.name2Votes ?? 0;
+  const totalVotes = votes1 + votes2;
+  const percentage1 = totalVotes > 0 ? Math.round((votes1 / totalVotes) * 100) : 0;
+  const percentage2 = totalVotes > 0 ? Math.round((votes2 / totalVotes) * 100) : 0;
+  const showVoteBars = status === 'active' && totalVotes > 0 && (isOwner || isLocked);
 
   // Correctness state
   const name1Correct = prediction?.name1Correct; // true | false | null
@@ -1458,6 +1499,21 @@ function PlaceholderMatchup({
                   >Pick</button>
           )}
         </div>
+        {showVoteBars && (
+          <div className="px-2.5 pb-1.5">
+            <div className="flex items-center gap-1">
+              <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-500 dark:bg-blue-400 transition-all duration-300"
+                  style={{ width: `${percentage1}%` }}
+                />
+              </div>
+              <span className={`text-[9px] w-14 text-right tabular-nums ${percentage1 > percentage2 ? 'text-green-600 dark:text-green-400 font-bold' : 'text-gray-400 dark:text-gray-500 font-medium'}`}>
+                {`${votes1} (${percentage1}%)`}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Name 2 prediction row */}
         {name2Wrong && officialName2 && (
@@ -1495,6 +1551,21 @@ function PlaceholderMatchup({
                   >Pick</button>
           )}
         </div>
+        {showVoteBars && (
+          <div className="px-2.5 pb-1.5">
+            <div className="flex items-center gap-1">
+              <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-purple-500 dark:bg-purple-400 transition-all duration-300"
+                  style={{ width: `${percentage2}%` }}
+                />
+              </div>
+              <span className={`text-[9px] w-14 text-right tabular-nums ${percentage2 > percentage1 ? 'text-green-600 dark:text-green-400 font-bold' : 'text-gray-400 dark:text-gray-500 font-medium'}`}>
+                {`${votes2} (${percentage2}%)`}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

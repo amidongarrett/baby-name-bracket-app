@@ -112,8 +112,14 @@ export default function BracketListView({
     const feederPicks = feederKey ? (picks[feederKey] || []) : [];
     const count = ROUND_MATCHUP_COUNT[displayRoundKey] || 0;
     return Array.from({ length: count }, (_, i) => {
-      const n1Id = feederPicks[i * 2] || null;
-      const n2Id = feederPicks[i * 2 + 1] || null;
+      // For final4, slot i pairs elite8 positions i and i+2 (cross-division),
+      // mirroring the canvas view's feeder logic (e8[0] vs e8[2], e8[1] vs e8[3]).
+      // All other rounds use consecutive pairs (i*2 and i*2+1).
+      const isFinal4 = displayRoundKey === 'final4';
+      const n1Idx = isFinal4 ? i : i * 2;
+      const n2Idx = isFinal4 ? i + 2 : i * 2 + 1;
+      const n1Id = feederPicks[n1Idx] || null;
+      const n2Id = feederPicks[n2Idx] || null;
       const rawFeeder = bracketMatchups[feederKey] || [];
       return {
         _id: `ph-${displayRoundKey}-${i}`,
@@ -121,8 +127,8 @@ export default function BracketListView({
         name2Id: n2Id,
         name1: n1Id ? (nameMap[n1Id]?.value || 'TBD') : 'TBD',
         name2: n2Id ? (nameMap[n2Id]?.value || 'TBD') : 'TBD',
-        seed1: getPickedSeedFromRaw(rawFeeder, i * 2, n1Id),
-        seed2: getPickedSeedFromRaw(rawFeeder, i * 2 + 1, n2Id),
+        seed1: getPickedSeedFromRaw(rawFeeder, n1Idx, n1Id),
+        seed2: getPickedSeedFromRaw(rawFeeder, n2Idx, n2Id),
         votes1: voteTallies?.[displayRoundKey]?.[i]?.name1Votes ?? 0,
         votes2: voteTallies?.[displayRoundKey]?.[i]?.name2Votes ?? 0,
         winnerId: null,
