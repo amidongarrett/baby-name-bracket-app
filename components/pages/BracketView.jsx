@@ -389,7 +389,7 @@ export default function BracketIdPage({ params, shareToken = null }) {
     ? ['roundOf32', 'roundOf16', 'elite8', 'final4', 'championship']
     : publishedRounds;
 
-  const activeRoundKey = ROUND_KEY_MAP[bracket?.currentRound] || 'roundOf32';
+  const activeRoundKey = ROUND_KEY_MAP[bracket?.currentRound] || (bracket?.status === 'completed' ? 'championship' : 'roundOf32');
 
   const currentRoundKey = bracket.currentRound === 'Completed'
     ? 'championship'
