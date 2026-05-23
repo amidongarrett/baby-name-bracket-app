@@ -58,18 +58,14 @@ export default function NameCard({
           <span className="text-green-600 font-semibold">{feederWrongPick.actualName}</span>
         </div>
       )}
-      {guestWrong && (
-        <div className="text-[9px] text-green-600 font-semibold px-2.5 pt-1">
-          ✓ Actual: {otherName}
-        </div>
-      )}
+
       <div className={`flex items-center justify-between px-2.5 py-2 ${borderClass} transition-colors ${rowBg} ${guestCorrect ? 'border-l-4 border-green-500' : ''}`}>
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
           <span className={`text-xs font-bold w-5 text-center shrink-0 ${otherIsWinner ? 'text-gray-400' : 'text-gray-500 dark:text-gray-400'}`}>
             {isPlaceholder ? '-' : seed}
           </span>
           {isWinner && <span className="text-xs shrink-0">🏆</span>}
-          <span className={`text-sm truncate ${guestWrong ? 'line-through text-red-400 dark:text-red-500' : nameText}`}>
+          <span className={`text-sm truncate ${nameText}`}>
             {name}
           </span>
           {hasConflict && dadVotedThis && <span className="text-xs shrink-0 ml-1">👨</span>}
@@ -100,10 +96,13 @@ export default function NameCard({
                     </button>
                   )
         )}
+        {effectiveWinnerId && votedForThis && (
+          <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold text-blue-700 bg-blue-100 dark:bg-blue-900/40 dark:text-blue-400 rounded">Picked</span>
+        )}
         {status === 'draft' && <span className="text-[10px] text-gray-400 ml-2">-</span>}
       </div>
 
-      {status === 'active' && !isPlaceholder && showVoteBars && (
+      {(status === 'active' || status === 'completed') && !isPlaceholder && showVoteBars && (
         <div className={`px-2.5 pb-1.5 ${otherIsWinner ? 'opacity-40' : ''}`}>
           <div className="flex items-center gap-1">
             <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
