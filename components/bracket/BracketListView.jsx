@@ -123,6 +123,8 @@ export default function BracketListView({
         name2: n2Id ? (nameMap[n2Id]?.value || 'TBD') : 'TBD',
         seed1: getPickedSeedFromRaw(rawFeeder, i * 2, n1Id),
         seed2: getPickedSeedFromRaw(rawFeeder, i * 2 + 1, n2Id),
+        votes1: voteTallies?.[displayRoundKey]?.[i]?.name1Votes ?? 0,
+        votes2: voteTallies?.[displayRoundKey]?.[i]?.name2Votes ?? 0,
         winnerId: null,
         isPlaceholder: !n1Id || !n2Id,
       };
