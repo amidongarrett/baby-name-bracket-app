@@ -32,6 +32,31 @@ export default function BracketListView({
   bracketId,
   onProceedToNextRound,
 }) {
+  // Build per-round name vote totals from voteTallies.
+  // Uses allVotes (full name→count map per slot) if available; falls back to top-2 pairs.
+  const nameVotesByRound = {};
+  ['roundOf32', 'roundOf16', 'elite8', 'final4', 'championship'].forEach(rk => {
+    const totals = {};
+    Object.values(voteTallies?.[rk] || {}).forEach(tally => {
+      if (tally?.allVotes) {
+        Object.entries(tally.allVotes).forEach(([nameId, count]) => {
+          totals[nameId] = (totals[nameId] || 0) + count;
+        });
+      } else {
+        if (tally?.name1Id) totals[tally.name1Id] = (totals[tally.name1Id] || 0) + (tally.name1Votes || 0);
+        if (tally?.name2Id) totals[tally.name2Id] = (totals[tally.name2Id] || 0) + (tally.name2Votes || 0);
+      }
+    });
+    nameVotesByRound[rk] = totals;
+  });
+  // Future-round cards use their own round's tally (not the predecessor).
+  const VOTE_SOURCE_FOR_ROUND = {
+    roundOf16: 'roundOf16',
+    elite8: 'elite8',
+    final4: 'final4',
+    championship: 'championship',
+  };
+
   const [proceedLoading, setProceedLoading] = useState(false);
   const [displayRoundKey, setDisplayRoundKey] = useState(activeRoundKey);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -100,8 +125,8 @@ export default function BracketListView({
           name2: n2?.value || (typeof m.name2 === 'string' ? m.name2 : null) || name2Obj?.value || 'TBD',
           name1Id: m.name1Id || name1Obj?.id || null,
           name2Id: m.name2Id || name2Obj?.id || null,
-          votes1: voteTallies?.[displayRoundKey]?.[i]?.name1Votes ?? m.votes1 ?? m.votes?.name1Votes ?? 0,
-          votes2: voteTallies?.[displayRoundKey]?.[i]?.name2Votes ?? m.votes2 ?? m.votes?.name2Votes ?? 0,
+          votes1: m.votes1 ?? m.votes?.name1Votes ?? 0,
+          votes2: m.votes2 ?? m.votes?.name2Votes ?? 0,
           winnerId: m.winnerId || null,
         };
       });
@@ -129,8 +154,8 @@ export default function BracketListView({
         name2: n2Id ? (nameMap[n2Id]?.value || 'TBD') : 'TBD',
         seed1: getPickedSeedFromRaw(rawFeeder, n1Idx, n1Id),
         seed2: getPickedSeedFromRaw(rawFeeder, n2Idx, n2Id),
-        votes1: voteTallies?.[displayRoundKey]?.[i]?.name1Votes ?? 0,
-        votes2: voteTallies?.[displayRoundKey]?.[i]?.name2Votes ?? 0,
+        votes1: (nameVotesByRound[VOTE_SOURCE_FOR_ROUND[displayRoundKey]] || {})[n1Id] ?? 0,
+        votes2: (nameVotesByRound[VOTE_SOURCE_FOR_ROUND[displayRoundKey]] || {})[n2Id] ?? 0,
         winnerId: null,
         isPlaceholder: !n1Id || !n2Id,
       };

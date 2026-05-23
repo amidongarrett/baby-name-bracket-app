@@ -133,6 +133,25 @@ export default function BracketView({
     if (m.name2Id) nameSeedMap[m.name2Id] = m.seed2 ?? null;
   });
 
+  // Build per-round name vote totals from voteTallies.
+  // allVotes (added by backend) contains counts for ALL names at each position,
+  // not just the top 2 — so we can look up any name the viewer predicted.
+  const nameVotesByRound = {};
+  ['roundOf32', 'roundOf16', 'elite8', 'final4', 'championship'].forEach(rk => {
+    const totals = {};
+    Object.values(voteTallies?.[rk] || {}).forEach(tally => {
+      if (tally?.allVotes) {
+        Object.entries(tally.allVotes).forEach(([nameId, count]) => {
+          totals[nameId] = (totals[nameId] || 0) + count;
+        });
+      } else {
+        if (tally?.name1Id) totals[tally.name1Id] = (totals[tally.name1Id] || 0) + (tally.name1Votes || 0);
+        if (tally?.name2Id) totals[tally.name2Id] = (totals[tally.name2Id] || 0) + (tally.name2Votes || 0);
+      }
+    });
+    nameVotesByRound[rk] = totals;
+  });
+
   const SLOT_HEIGHT = 130; // px per R32 slot
   const TOTAL_HEIGHT = 8 * SLOT_HEIGHT; // 1040px — shared by ALL round columns
   const F4_CARD_HEIGHT       = 88;  // approximate rendered height of a two-row F4 / Championship card (px)
@@ -432,9 +451,7 @@ export default function BracketView({
                               pickRoundKey="roundOf16"
                               pickPosition={i}
                               userPickId={picks.roundOf16?.[i] || null}
-                              voteTallies={voteTallies}
-                              tallyRoundKey="roundOf16"
-                              tallyIndex={i}
+                              nameVoteTotals={nameVotesByRound['roundOf16']}
                               isLocked={isLocked}
                             />
                           );
@@ -533,9 +550,7 @@ export default function BracketView({
                             pickRoundKey="elite8"
                             pickPosition={i}
                             userPickId={picks.elite8?.[i] || null}
-                            voteTallies={voteTallies}
-                            tallyRoundKey="elite8"
-                            tallyIndex={i}
+                            nameVoteTotals={nameVotesByRound['elite8']}
                             isLocked={isLocked}
                           />
                           );
@@ -670,9 +685,7 @@ export default function BracketView({
                             pickRoundKey="final4"
                             pickPosition={0}
                             userPickId={picks.final4?.[0] || null}
-                            voteTallies={voteTallies}
-                            tallyRoundKey="final4"
-                            tallyIndex={0}
+                            nameVoteTotals={nameVotesByRound['final4']}
                             isLocked={isLocked}
                           />
                         );
@@ -758,9 +771,7 @@ export default function BracketView({
                             pickRoundKey="championship"
                             pickPosition={0}
                             userPickId={picks.championship?.[0] || null}
-                            voteTallies={voteTallies}
-                            tallyRoundKey="championship"
-                            tallyIndex={0}
+                            nameVoteTotals={nameVotesByRound['championship']}
                             isLocked={isLocked}
                           />
                         );
@@ -949,9 +960,7 @@ export default function BracketView({
                             pickRoundKey="final4"
                             pickPosition={1}
                             userPickId={picks.final4?.[1] || null}
-                            voteTallies={voteTallies}
-                            tallyRoundKey="final4"
-                            tallyIndex={1}
+                            nameVoteTotals={nameVotesByRound['final4']}
                             isLocked={isLocked}
                           />
                         );
@@ -1053,9 +1062,7 @@ export default function BracketView({
                             pickRoundKey="elite8"
                             pickPosition={2 + i}
                             userPickId={picks.elite8?.[2 + i] || null}
-                            voteTallies={voteTallies}
-                            tallyRoundKey="elite8"
-                            tallyIndex={2 + i}
+                            nameVoteTotals={nameVotesByRound['elite8']}
                             isLocked={isLocked}
                           />
                           );
@@ -1153,9 +1160,7 @@ export default function BracketView({
                               pickRoundKey="roundOf16"
                               pickPosition={4 + i}
                               userPickId={picks.roundOf16?.[4 + i] || null}
-                              voteTallies={voteTallies}
-                              tallyRoundKey="roundOf16"
-                              tallyIndex={4 + i}
+                              nameVoteTotals={nameVotesByRound['roundOf16']}
                               isLocked={isLocked}
                             />
                           );
@@ -1361,9 +1366,7 @@ function PlaceholderMatchup({
   pickPosition = null,
   userPickId = null,
   // Vote bar props
-  voteTallies = null,
-  tallyRoundKey = null,
-  tallyIndex = 0,
+  nameVoteTotals = null,
   isLocked = false,
 }) {
   // connectorSide overrides side for connector direction only — lets the right-side
@@ -1394,9 +1397,11 @@ function PlaceholderMatchup({
     );
   }
 
-  // Vote bar derivation
-  const votes1 = voteTallies?.[tallyRoundKey]?.[tallyIndex]?.name1Votes ?? 0;
-  const votes2 = voteTallies?.[tallyRoundKey]?.[tallyIndex]?.name2Votes ?? 0;
+  // Vote bar derivation — fall back to winnerId from feeder matchup stubs when prediction IDs are absent
+  const lookupId1 = prediction?.guestName1Id || matchup1?.winnerId || null;
+  const lookupId2 = prediction?.guestName2Id || matchup2?.winnerId || null;
+  const votes1 = (nameVoteTotals && lookupId1) ? (nameVoteTotals[lookupId1] ?? 0) : 0;
+  const votes2 = (nameVoteTotals && lookupId2) ? (nameVoteTotals[lookupId2] ?? 0) : 0;
   const totalVotes = votes1 + votes2;
   const percentage1 = totalVotes > 0 ? Math.round((votes1 / totalVotes) * 100) : 0;
   const percentage2 = totalVotes > 0 ? Math.round((votes2 / totalVotes) * 100) : 0;

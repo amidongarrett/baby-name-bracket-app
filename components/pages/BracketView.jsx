@@ -20,7 +20,7 @@ const ROUND_KEY_MAP = {
   'Championship': 'championship',
 };
 
-export default function BracketIdPage({ params }) {
+export default function BracketIdPage({ params, shareToken = null }) {
   // Next.js 15 async params pattern
   const { id: bracketId } = use(params);
 
@@ -86,6 +86,18 @@ export default function BracketIdPage({ params }) {
   useEffect(() => {
     if (token) fetchUserBracket();
   }, [token, user?.id]);
+
+  // If the page was opened via a share-token invite link, register the user as a guest participant.
+  useEffect(() => {
+    if (!shareToken || !token || !bracketId) return;
+    fetch(`${BASE_URL}/api/bracket/${bracketId}/join-share`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ shareToken }),
+    }).then(res => {
+      if (res.ok) fetchUserBracket(); // refresh userBracket after join
+    }).catch(() => {});
+  }, [shareToken, token, bracketId]);
 
   const fetchMyScore = async () => {
     if (!user?.id) return;
