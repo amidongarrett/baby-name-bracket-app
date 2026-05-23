@@ -1,5 +1,8 @@
 "use client";
 
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+
 export default function ConfirmModal({
   title,
   message,
@@ -9,7 +12,12 @@ export default function ConfirmModal({
   onCancel,
   loading = false,
 }) {
-  return (
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
         <h2 className="text-lg font-bold text-red-600 dark:text-red-400 mb-2">{title}</h2>
@@ -32,6 +40,7 @@ export default function ConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

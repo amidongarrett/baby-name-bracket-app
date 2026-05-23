@@ -7,6 +7,7 @@ import { advanceTournamentRound } from '@/utils/api';
 import { useUser } from '@/contexts/UserContext';
 import { useBracket } from '@/contexts/BracketContext';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import LeaderboardStrip from '@/components/ui/LeaderboardStrip';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -397,12 +398,21 @@ export default function BracketIdPage({ params }) {
       {/* Header */}
       <div className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-800">
         <div className="max-w-7xl mx-auto px-4 py-5">
-          <div className="flex items-center justify-between">
+          <div className="grid grid-cols-3 items-center">
+            {/* Left: title */}
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{bracketTitle}</h1>
             </div>
 
-            <div className="flex items-center gap-3">
+            {/* Center: leaderboard strip */}
+            <div className="flex justify-center min-w-0 overflow-hidden">
+              {bracket.status !== 'draft' && (
+                <LeaderboardStrip bracketId={bracketId} currentUserId={user?.id} />
+              )}
+            </div>
+
+            {/* Right: view toggle, right-aligned */}
+            <div className="flex justify-end">
               {bracket.status !== 'draft' && (
                 <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-sm font-medium">
                   <button

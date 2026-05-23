@@ -8,6 +8,7 @@ import { useBracket } from '@/contexts/BracketContext';
 import { updateProfile } from '@/lib/authApi';
 import InviteModal from '@/components/bracket/InviteModal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import LeaderboardModal from '@/components/ui/LeaderboardModal';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -22,6 +23,7 @@ export default function Navbar() {
   const [showResetModal, setShowResetModal] = useState(false);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [showUnlockLockinModal, setShowUnlockLockinModal] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [dangerLoading, setDangerLoading] = useState(false);
   const [iconSaving, setIconSaving] = useState(false);
   const menuRef  = useRef(null);
@@ -225,6 +227,22 @@ export default function Navbar() {
                             <p className="text-xs text-gray-400 dark:text-gray-500">See the current bracket view</p>
                           </div>
                         </Link>
+                      </div>
+                    )}
+
+                    {/* Leaderboard — shown only on the bracket view page */}
+                    {isBracketViewPage && (
+                      <div className="px-2 py-1 border-b border-gray-100 dark:border-gray-800">
+                        <button
+                          onClick={() => { closeMenu(); setShowLeaderboard(true); }}
+                          className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+                        >
+                          <span className="text-xl leading-none">🏅</span>
+                          <div>
+                            <p className="font-semibold text-gray-700 dark:text-gray-200">Leaderboard</p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500">See how everyone is ranked</p>
+                          </div>
+                        </button>
                       </div>
                     )}
 
@@ -441,6 +459,13 @@ export default function Navbar() {
 
         </div>
       </div>
+      {showLeaderboard && (
+        <LeaderboardModal
+          bracketId={currentBracketId}
+          currentUserId={user?.id}
+          onClose={() => setShowLeaderboard(false)}
+        />
+      )}
       {showInviteModal && (
         <InviteModal
           bracketId={currentBracketId}
