@@ -1500,8 +1500,18 @@ function PlaceholderMatchup({
           )}
         </div>
         {showVoteBars && (
-          <div className="h-1 bg-gray-100 dark:bg-gray-800">
-            <div className="h-full bg-blue-400 dark:bg-blue-500 transition-all" style={{ width: `${percentage1}%` }} />
+          <div className="px-2.5 pb-1.5">
+            <div className="flex items-center gap-1">
+              <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-500 dark:bg-blue-400 transition-all duration-300"
+                  style={{ width: `${percentage1}%` }}
+                />
+              </div>
+              <span className={`text-[9px] w-14 text-right tabular-nums ${percentage1 > percentage2 ? 'text-green-600 dark:text-green-400 font-bold' : 'text-gray-400 dark:text-gray-500 font-medium'}`}>
+                {`${votes1} (${percentage1}%)`}
+              </span>
+            </div>
           </div>
         )}
 
@@ -1542,8 +1552,18 @@ function PlaceholderMatchup({
           )}
         </div>
         {showVoteBars && (
-          <div className="h-1 bg-gray-100 dark:bg-gray-800">
-            <div className="h-full bg-purple-400 dark:bg-purple-500 transition-all" style={{ width: `${percentage2}%` }} />
+          <div className="px-2.5 pb-1.5">
+            <div className="flex items-center gap-1">
+              <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-purple-500 dark:bg-purple-400 transition-all duration-300"
+                  style={{ width: `${percentage2}%` }}
+                />
+              </div>
+              <span className={`text-[9px] w-14 text-right tabular-nums ${percentage2 > percentage1 ? 'text-green-600 dark:text-green-400 font-bold' : 'text-gray-400 dark:text-gray-500 font-medium'}`}>
+                {`${votes2} (${percentage2}%)`}
+              </span>
+            </div>
           </div>
         )}
       </div>
