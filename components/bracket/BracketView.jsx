@@ -7,6 +7,7 @@
 
 import { useRef, useState } from 'react';
 import MatchupCard from './MatchupCard';
+import { computeGhostPicks } from '@/utils/ghostPicks';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -179,6 +180,11 @@ export default function BracketView({
   const picks = userBracket?.picks || { roundOf32: [], roundOf16: [], elite8: [], final4: [], championship: [] };
   const isLocked        = !!userBracket?.lockedAt;
   const isRoundPublished = publishedRounds.includes(activeRoundKey);
+
+  // Ghost pick projections — eliminated picks that the user predicted to appear in future rounds
+  const ghostsByMatchup = (isLocked && userBracket)
+    ? computeGhostPicks(bracketMatchups, picks, nameMap)
+    : {};
   const isR16Published  = publishedRounds.includes('roundOf16');
   const isE8Published   = publishedRounds.includes('elite8');
   const isF4Published   = publishedRounds.includes('final4');
@@ -426,6 +432,7 @@ export default function BracketView({
                             name1Confirmed={name1Confirmed}
                             name2Confirmed={name2Confirmed}
                             userPickId={userBracket?.picks?.roundOf16?.[i]}
+                            ghostPicks={ghostsByMatchup?.roundOf16?.[i] || null}
                             onPick={onPick}
                           />
                           );
@@ -523,6 +530,7 @@ export default function BracketView({
                             name1Confirmed={name1Confirmed}
                             name2Confirmed={name2Confirmed}
                             userPickId={userBracket?.picks?.elite8?.[i]}
+                            ghostPicks={ghostsByMatchup?.elite8?.[i] || null}
                             onPick={onPick}
                           />
                           );
@@ -653,6 +661,7 @@ export default function BracketView({
                           name1Confirmed={name1Confirmed}
                           name2Confirmed={name2Confirmed}
                           userPickId={userBracket?.picks?.final4?.[0]}
+                          ghostPicks={ghostsByMatchup?.final4?.[0] || null}
                           onPick={onPick}
                         />
                       </div>
@@ -742,6 +751,7 @@ export default function BracketView({
                           name1Confirmed={name1Confirmed}
                           name2Confirmed={name2Confirmed}
                           userPickId={userBracket?.picks?.championship?.[0]}
+                          ghostPicks={ghostsByMatchup?.championship?.[0] || null}
                           onPick={onPick}
                         />
                       </div>
@@ -928,6 +938,7 @@ export default function BracketView({
                           name1Confirmed={name1Confirmed}
                           name2Confirmed={name2Confirmed}
                           userPickId={userBracket?.picks?.final4?.[1]}
+                          ghostPicks={ghostsByMatchup?.final4?.[1] || null}
                           onPick={onPick}
                         />
                       </div>
@@ -1035,6 +1046,7 @@ export default function BracketView({
                             name1Confirmed={name1Confirmed}
                             name2Confirmed={name2Confirmed}
                             userPickId={userBracket?.picks?.elite8?.[2 + i]}
+                            ghostPicks={ghostsByMatchup?.elite8?.[2 + i] || null}
                             onPick={onPick}
                           />
                           );
@@ -1135,6 +1147,7 @@ export default function BracketView({
                             name1Confirmed={name1Confirmed}
                             name2Confirmed={name2Confirmed}
                             userPickId={userBracket?.picks?.roundOf16?.[4 + i]}
+                            ghostPicks={ghostsByMatchup?.roundOf16?.[4 + i] || null}
                             onPick={onPick}
                           />
                           );

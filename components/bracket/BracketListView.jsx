@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import ListMatchupCard from './ListMatchupCard';
+import { computeGhostPicks } from '@/utils/ghostPicks';
 
 // Maps API round keys → human-readable labels
 const ROUND_DISPLAY = {
@@ -72,6 +73,11 @@ export default function BracketListView({
   const picks = userBracket?.picks || { roundOf32: [], roundOf16: [], elite8: [], final4: [], championship: [] };
   const isLocked = !!userBracket?.lockedAt;
   const isRoundPublished = publishedRounds.includes(activeRoundKey);
+
+  // Ghost pick projections — eliminated picks that the user predicted to appear in future rounds
+  const ghostsByMatchup = (isLocked && userBracket)
+    ? computeGhostPicks(bracketMatchups, picks, nameMap)
+    : {};
 
   // Derive voted count from userBracket picks for the active round
   const currentRoundPicks = picks[activeRoundKey] || [];
@@ -263,6 +269,7 @@ export default function BracketListView({
           ownerPicks={ownerPicks}
           isRoundPublished={isRoundPast ? true : isRoundPublished}
           activeRoundKey={displayRoundKey}
+          ghostPicks={ghostsByMatchup?.[displayRoundKey]?.[index] || null}
           onPick={isRoundPast ? undefined : onPick}
         />
       ))}
