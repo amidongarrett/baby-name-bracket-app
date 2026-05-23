@@ -464,6 +464,28 @@ export default function Navbar() {
           bracketId={currentBracketId}
           currentUserId={user?.id}
           onClose={() => setShowLeaderboard(false)}
+          bracketMatchups={currentBracket?.matchups || {}}
+          nameMap={
+            (() => {
+              const allNames = [
+                ...(currentBracket?.owner1Names || []),
+                ...(currentBracket?.owner2Names || []),
+                ...(currentBracket?.sharedNames || []),
+              ];
+              return Object.fromEntries(allNames.map(n => [n.id, n]));
+            })()
+          }
+          voteTallies={null}
+          publishedRounds={
+            currentBracket?.status === 'completed'
+              ? ['roundOf32', 'roundOf16', 'elite8', 'final4', 'championship']
+              : (currentBracket?.publishedRounds || [])
+          }
+          activeRoundKey={
+            { 'Round of 32': 'roundOf32', 'Round of 16': 'roundOf16', 'Elite 8': 'elite8', 'Final 4': 'final4', 'Championship': 'championship' }[currentBracket?.currentRound]
+            || (currentBracket?.status === 'completed' ? 'championship' : 'roundOf32')
+          }
+          token={token}
         />
       )}
       {showInviteModal && (
