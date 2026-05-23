@@ -112,7 +112,7 @@ export default function NameCard({
                 style={{ width: `${percentage}%` }}
               />
             </div>
-            <span className="text-[9px] text-gray-400 dark:text-gray-500 font-medium w-14 text-right tabular-nums">
+            <span className={`text-[9px] w-14 text-right tabular-nums ${isLeading ? 'text-green-600 dark:text-green-400 font-bold' : 'text-gray-400 dark:text-gray-500 font-medium'}`}>
               {`${votes} (${percentage}%)`}
             </span>
           </div>

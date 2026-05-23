@@ -74,8 +74,8 @@ export default function MatchupCard({
   const winner2 = effectiveWinnerId && effectiveWinnerId === name2Id;
 
   // Real-time leading — only owners see this
-  const leading1 = isOwner && !effectiveWinnerId && votes1 > 0 && votes1 > votes2;
-  const leading2 = isOwner && !effectiveWinnerId && votes2 > 0 && votes2 > votes1;
+  const leading1 = (isOwner || isLocked) && !effectiveWinnerId && votes1 > 0 && votes1 > votes2;
+  const leading2 = (isOwner || isLocked) && !effectiveWinnerId && votes2 > 0 && votes2 > votes1;
 
   // Wrong pick visualization — owners never get "wrong pick" styling
   const guestWrongOnName1 = !isOwner && isRoundPublished && winner2 && votedForName1;
