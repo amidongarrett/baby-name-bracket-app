@@ -21,6 +21,7 @@ export default function NameGenerator({ bracketId, excludeNames = [], onGenerate
   const [prompt, setPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [noResults, setNoResults] = useState(false);
 
   // Fetch all name pools on mount
   useEffect(() => {
@@ -73,6 +74,7 @@ export default function NameGenerator({ bracketId, excludeNames = [], onGenerate
   async function handleAiSubmit() {
     if (!prompt.trim() || aiLoading || bankHasItems) return;
 
+    setNoResults(false);
     setAiLoading(true);
     setError(null);
 
@@ -99,8 +101,13 @@ export default function NameGenerator({ bracketId, excludeNames = [], onGenerate
         return;
       }
 
-      onBankFilled(data.suggestions);
-      setPrompt('');
+      if (data.suggestions.length === 0) {
+        setNoResults(true);
+      } else {
+        setNoResults(false);
+        onBankFilled(data.suggestions);
+        setPrompt('');
+      }
     } catch (err) {
       console.error('NameGenerator: suggestion request failed', err);
       setError('Failed to connect to server');
@@ -193,6 +200,12 @@ export default function NameGenerator({ bracketId, excludeNames = [], onGenerate
         placeholder="e.g. vintage botanical, strong, Irish..."
         className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground text-sm"
       />
+
+      {noResults && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-1">
+          No suggestions found for this prompt — try adjusting your description.
+        </p>
+      )}
 
       {/* Liked names checkbox */}
       <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer select-none">
