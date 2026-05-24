@@ -4,8 +4,9 @@ import { useState, useEffect, useRef } from 'react';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-export default function NameGenerator({ bracketId, excludeNames = [], onGenerate, onBankFilled, bankHasItems }) {
+export default function NameGenerator({ bracketId, excludeNames = [], onGenerate, onBankFilled, bankHasItems, likedNames = [] }) {
   const [selectedGender, setSelectedGender] = useState('neutral');
+  const [useLikedNames, setUseLikedNames] = useState(false);
 
   // --- Simple random generator state ---
   const [namePool, setNamePool] = useState({ girl: [], boy: [], neutral: [] });
@@ -87,6 +88,7 @@ export default function NameGenerator({ bracketId, excludeNames = [], onGenerate
           prompt: prompt.trim(),
           gender: selectedGender,
           excludeNames,
+          likedNames: useLikedNames ? likedNames : [],
         }),
       });
 
@@ -191,6 +193,17 @@ export default function NameGenerator({ bracketId, excludeNames = [], onGenerate
         placeholder="e.g. vintage botanical, strong, Irish..."
         className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground text-sm"
       />
+
+      {/* Liked names checkbox */}
+      <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={useLikedNames}
+          onChange={(e) => setUseLikedNames(e.target.checked)}
+          className="rounded border-gray-300 text-foreground focus:ring-foreground"
+        />
+        Use my chosen names as style inspiration
+      </label>
 
       {/* AI suggestions button */}
       <button

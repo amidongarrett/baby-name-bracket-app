@@ -69,9 +69,12 @@ export default function BracketNamesPage({ params }) {
   const [owner1BankNames, setOwner1BankNames] = useState([]);
   const [owner2BankNames, setOwner2BankNames] = useState([]);
 
-  // AI suggestion banks (ephemeral staging area, local state only)
+  // AI suggestion banks (ephemeral staging area, persisted to DB)
   const [owner1AiBank, setOwner1AiBank] = useState([]);
   const [owner2AiBank, setOwner2AiBank] = useState([]);
+
+  // Dismissed AI suggestion names for the logged-in owner (persisted to DB)
+  const [dismissedNames, setDismissedNames] = useState([]);
 
   const MAX_NAMES = 16;
 
@@ -237,6 +240,34 @@ export default function BracketNamesPage({ params }) {
       fetchBracketData();
     }
   }, [apiConnected]);
+
+  // Fire-and-forget helper to persist AI bank/dismissed changes to the DB
+  const syncPreferences = async (patch) => {
+    const authToken = localStorage.getItem('authToken');
+    await fetch(`${BASE_URL}/api/names/preferences/${bracketId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+      body: JSON.stringify(patch),
+    });
+    // fire-and-forget: failures are non-critical; no error surfaced to user
+  };
+
+  // Load persisted AI bank and dismissed names for the logged-in owner
+  useEffect(() => {
+    if (!apiConnected || !isOwner) return;
+    const load = async () => {
+      const authToken = localStorage.getItem('authToken');
+      const res = await fetch(`${BASE_URL}/api/names/preferences/${bracketId}`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (!res.ok) return;
+      const { bankNames, dismissedNames: dismissed } = await res.json();
+      if (isOwner1) setOwner1AiBank(bankNames);
+      if (isOwner2) setOwner2AiBank(bankNames);
+      setDismissedNames(dismissed);
+    };
+    load();
+  }, [apiConnected, isOwner1, isOwner2]);
 
   // Real-time polling on the names page (draft status only)
   useEffect(() => {
@@ -560,17 +591,29 @@ export default function BracketNamesPage({ params }) {
     ...owner1Names.map(n => n.name),
     ...owner1BankNames.map(n => n.name),
     ...sharedNames.map(n => n.name),
+    ...(isOwner1 ? dismissedNames : []),
   ];
   const owner2ExcludeNames = [
     ...owner2Names.map(n => n.name),
     ...owner2BankNames.map(n => n.name),
     ...sharedNames.map(n => n.name),
+    ...(isOwner2 ? dismissedNames : []),
   ];
 
   // AI bank handlers — Owner 1
-  const handleOwner1BankFilled = (suggestions) => setOwner1AiBank(suggestions);
-  const handleOwner1AiDismiss = (name) => setOwner1AiBank(prev => prev.filter(s => s.name !== name));
+  const handleOwner1BankFilled = (suggestions) => {
+    setOwner1AiBank(suggestions);
+    syncPreferences({ bankNames: suggestions });
+  };
+  const handleOwner1AiDismiss = (name) => {
+    const newBank = owner1AiBank.filter(s => s.name !== name);
+    const newDismissed = [...dismissedNames, name];
+    setOwner1AiBank(newBank);
+    setDismissedNames(newDismissed);
+    syncPreferences({ bankNames: newBank, dismissedNames: newDismissed });
+  };
   const handleOwner1AiAdd = async (name) => {
+    const newBank = owner1AiBank.filter(s => s.name !== name);
     try {
       const response = await fetch(`${BASE_URL}/api/names`, {
         method: 'POST',
@@ -582,7 +625,8 @@ export default function BracketNamesPage({ params }) {
         console.error('Failed to add AI name:', data.error || 'Unknown error');
         return;
       }
-      setOwner1AiBank(prev => prev.filter(s => s.name !== name));
+      setOwner1AiBank(newBank);
+      syncPreferences({ bankNames: newBank });
       await fetchBracketData();
     } catch (err) {
       console.error('Error adding AI name:', err);
@@ -590,9 +634,19 @@ export default function BracketNamesPage({ params }) {
   };
 
   // AI bank handlers — Owner 2
-  const handleOwner2BankFilled = (suggestions) => setOwner2AiBank(suggestions);
-  const handleOwner2AiDismiss = (name) => setOwner2AiBank(prev => prev.filter(s => s.name !== name));
+  const handleOwner2BankFilled = (suggestions) => {
+    setOwner2AiBank(suggestions);
+    syncPreferences({ bankNames: suggestions });
+  };
+  const handleOwner2AiDismiss = (name) => {
+    const newBank = owner2AiBank.filter(s => s.name !== name);
+    const newDismissed = [...dismissedNames, name];
+    setOwner2AiBank(newBank);
+    setDismissedNames(newDismissed);
+    syncPreferences({ bankNames: newBank, dismissedNames: newDismissed });
+  };
   const handleOwner2AiAdd = async (name) => {
+    const newBank = owner2AiBank.filter(s => s.name !== name);
     try {
       const response = await fetch(`${BASE_URL}/api/names`, {
         method: 'POST',
@@ -604,7 +658,8 @@ export default function BracketNamesPage({ params }) {
         console.error('Failed to add AI name:', data.error || 'Unknown error');
         return;
       }
-      setOwner2AiBank(prev => prev.filter(s => s.name !== name));
+      setOwner2AiBank(newBank);
+      syncPreferences({ bankNames: newBank });
       await fetchBracketData();
     } catch (err) {
       console.error('Error adding AI name:', err);
@@ -687,6 +742,7 @@ export default function BracketNamesPage({ params }) {
                   onGenerate={(name) => setOwner1Input(name)}
                   onBankFilled={handleOwner1BankFilled}
                   bankHasItems={owner1AiBank.length > 0}
+                  likedNames={owner1Names.map(n => n.name)}
                 />
                 <AiNameBank
                   suggestions={owner1AiBank}
@@ -950,6 +1006,7 @@ export default function BracketNamesPage({ params }) {
                       onGenerate={(name) => setOwner2Input(name)}
                       onBankFilled={handleOwner2BankFilled}
                       bankHasItems={owner2AiBank.length > 0}
+                      likedNames={owner2Names.map(n => n.name)}
                     />
                     <AiNameBank
                       suggestions={owner2AiBank}
