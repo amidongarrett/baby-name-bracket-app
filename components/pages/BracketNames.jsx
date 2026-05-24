@@ -684,6 +684,7 @@ export default function BracketNamesPage({ params }) {
                 <NameGenerator
                   bracketId={bracketId}
                   excludeNames={owner1ExcludeNames}
+                  onGenerate={(name) => setOwner1Input(name)}
                   onBankFilled={handleOwner1BankFilled}
                   bankHasItems={owner1AiBank.length > 0}
                 />
@@ -946,6 +947,7 @@ export default function BracketNamesPage({ params }) {
                     <NameGenerator
                       bracketId={bracketId}
                       excludeNames={owner2ExcludeNames}
+                      onGenerate={(name) => setOwner2Input(name)}
                       onBankFilled={handleOwner2BankFilled}
                       bankHasItems={owner2AiBank.length > 0}
                     />
