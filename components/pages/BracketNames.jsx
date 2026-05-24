@@ -244,12 +244,16 @@ export default function BracketNamesPage({ params }) {
   // Fire-and-forget helper to persist AI bank/dismissed changes to the DB
   const syncPreferences = async (patch) => {
     const authToken = localStorage.getItem('authToken');
-    await fetch(`${BASE_URL}/api/names/preferences/${bracketId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
-      body: JSON.stringify(patch),
-    });
-    // fire-and-forget: failures are non-critical; no error surfaced to user
+    try {
+      const res = await fetch(`${BASE_URL}/api/names/preferences/${bracketId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) console.error('syncPreferences: server returned', res.status);
+    } catch (err) {
+      console.error('syncPreferences failed:', err);
+    }
   };
 
   // Load persisted AI bank and dismissed names for the logged-in owner
@@ -590,12 +594,14 @@ export default function BracketNamesPage({ params }) {
   const owner1ExcludeNames = [
     ...owner1Names.map(n => n.name),
     ...owner1BankNames.map(n => n.name),
+    ...owner1AiBank.map(n => n.name),
     ...sharedNames.map(n => n.name),
     ...(isOwner1 ? dismissedNames : []),
   ];
   const owner2ExcludeNames = [
     ...owner2Names.map(n => n.name),
     ...owner2BankNames.map(n => n.name),
+    ...owner2AiBank.map(n => n.name),
     ...sharedNames.map(n => n.name),
     ...(isOwner2 ? dismissedNames : []),
   ];
@@ -607,9 +613,11 @@ export default function BracketNamesPage({ params }) {
   };
   const handleOwner1AiDismiss = (name) => {
     const newBank = owner1AiBank.filter(s => s.name !== name);
-    const newDismissed = [...dismissedNames, name];
+    const alreadySelected = owner1Names.some(n => n.name.toLowerCase() === name.toLowerCase()) ||
+                            sharedNames.some(n => n.name.toLowerCase() === name.toLowerCase());
+    const newDismissed = alreadySelected ? dismissedNames : [...dismissedNames, name];
     setOwner1AiBank(newBank);
-    setDismissedNames(newDismissed);
+    if (!alreadySelected) setDismissedNames(newDismissed);
     syncPreferences({ bankNames: newBank, dismissedNames: newDismissed });
   };
   const handleOwner1AiAdd = async (name) => {
@@ -640,9 +648,11 @@ export default function BracketNamesPage({ params }) {
   };
   const handleOwner2AiDismiss = (name) => {
     const newBank = owner2AiBank.filter(s => s.name !== name);
-    const newDismissed = [...dismissedNames, name];
+    const alreadySelected = owner2Names.some(n => n.name.toLowerCase() === name.toLowerCase()) ||
+                            sharedNames.some(n => n.name.toLowerCase() === name.toLowerCase());
+    const newDismissed = alreadySelected ? dismissedNames : [...dismissedNames, name];
     setOwner2AiBank(newBank);
-    setDismissedNames(newDismissed);
+    if (!alreadySelected) setDismissedNames(newDismissed);
     syncPreferences({ bankNames: newBank, dismissedNames: newDismissed });
   };
   const handleOwner2AiAdd = async (name) => {
