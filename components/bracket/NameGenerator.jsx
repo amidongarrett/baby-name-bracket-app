@@ -1,19 +1,78 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-export default function NameGenerator({ bracketId, excludeNames = [], onBankFilled, bankHasItems }) {
+export default function NameGenerator({ bracketId, excludeNames = [], onGenerate, onBankFilled, bankHasItems }) {
   const [selectedGender, setSelectedGender] = useState('neutral');
+
+  // --- Simple random generator state ---
+  const [namePool, setNamePool] = useState({ girl: [], boy: [], neutral: [] });
+  const [poolLoading, setPoolLoading] = useState(true);
+  const seenNames = useRef({
+    girl: new Set(),
+    boy: new Set(),
+    neutral: new Set(),
+  });
+
+  // --- AI suggestion state ---
   const [prompt, setPrompt] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  async function handleSubmit() {
-    if (!prompt.trim() || loading || bankHasItems) return;
+  // Fetch all name pools on mount
+  useEffect(() => {
+    const fetchAllPools = async () => {
+      try {
+        const [girlRes, boyRes, neutralRes] = await Promise.all([
+          fetch(`${BASE_URL}/api/baby-names?gender=girl`),
+          fetch(`${BASE_URL}/api/baby-names?gender=boy`),
+          fetch(`${BASE_URL}/api/baby-names?gender=neutral`),
+        ]);
 
-    setLoading(true);
+        const [girlData, boyData, neutralData] = await Promise.all([
+          girlRes.json(),
+          boyRes.json(),
+          neutralRes.json(),
+        ]);
+
+        setNamePool({
+          girl: girlData.names || [],
+          boy: boyData.names || [],
+          neutral: neutralData.names || [],
+        });
+      } catch (err) {
+        console.error('NameGenerator: failed to fetch name pools', err);
+      } finally {
+        setPoolLoading(false);
+      }
+    };
+
+    fetchAllPools();
+  }, []);
+
+  function handleGenerate() {
+    const pool = namePool[selectedGender];
+    if (!pool || pool.length === 0) return;
+
+    const seen = seenNames.current[selectedGender];
+    let unseen = pool.filter((n) => !seen.has(n.name));
+
+    if (unseen.length === 0) {
+      seen.clear();
+      unseen = pool;
+    }
+
+    const pick = unseen[Math.floor(Math.random() * unseen.length)];
+    seen.add(pick.name);
+    onGenerate(pick.name);
+  }
+
+  async function handleAiSubmit() {
+    if (!prompt.trim() || aiLoading || bankHasItems) return;
+
+    setAiLoading(true);
     setError(null);
 
     try {
@@ -44,7 +103,7 @@ export default function NameGenerator({ bracketId, excludeNames = [], onBankFill
       console.error('NameGenerator: suggestion request failed', err);
       setError('Failed to connect to server');
     } finally {
-      setLoading(false);
+      setAiLoading(false);
     }
   }
 
@@ -77,11 +136,11 @@ export default function NameGenerator({ bracketId, excludeNames = [], onBankFill
     boy: 'bg-blue-500 hover:bg-blue-600 text-white',
   }[selectedGender];
 
-  const isDisabled = loading || bankHasItems;
+  const aiDisabled = aiLoading || bankHasItems;
 
   return (
     <div className="mb-4 space-y-2">
-      {/* Gender toggle row */}
+      {/* Gender toggle row — shared by both features */}
       <div className="flex gap-2">
         <button
           type="button"
@@ -106,24 +165,41 @@ export default function NameGenerator({ bracketId, excludeNames = [], onBankFill
         </button>
       </div>
 
-      {/* Style prompt input */}
+      {/* Simple random generator */}
+      <button
+        type="button"
+        onClick={handleGenerate}
+        disabled={poolLoading || namePool[selectedGender].length === 0}
+        className={`${generateButtonClass} w-full mt-1 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
+      >
+        Generate Name
+      </button>
+
+      {/* Divider */}
+      <div className="flex items-center gap-2 py-1">
+        <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+        <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">or get AI suggestions</span>
+        <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+      </div>
+
+      {/* AI prompt input */}
       <input
         type="text"
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && !isDisabled && handleSubmit()}
+        onKeyDown={(e) => e.key === 'Enter' && !aiDisabled && handleAiSubmit()}
         placeholder="e.g. vintage botanical, strong, Irish..."
         className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground text-sm"
       />
 
-      {/* Generate button */}
+      {/* AI suggestions button */}
       <button
         type="button"
-        onClick={handleSubmit}
-        disabled={isDisabled || !prompt.trim()}
+        onClick={handleAiSubmit}
+        disabled={aiDisabled || !prompt.trim()}
         className={`${generateButtonClass} w-full mt-1 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
       >
-        {loading ? 'Generating...' : 'Generate Names'}
+        {aiLoading ? 'Generating...' : 'Get AI Suggestions'}
       </button>
 
       {/* Disabled hint when bank has items */}
