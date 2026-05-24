@@ -1,65 +1,51 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-export default function NameGenerator({ onGenerate }) {
+export default function NameGenerator({ bracketId, excludeNames = [], onBankFilled, bankHasItems }) {
   const [selectedGender, setSelectedGender] = useState('neutral');
-  const [namePool, setNamePool] = useState({ girl: [], boy: [], neutral: [] });
-  const [loading, setLoading] = useState(true);
+  const [prompt, setPrompt] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const seenNames = useRef({
-    girl: new Set(),
-    boy: new Set(),
-    neutral: new Set(),
-  });
+  async function handleSubmit() {
+    if (!prompt.trim() || loading || bankHasItems) return;
 
-  useEffect(() => {
-    const fetchAllPools = async () => {
-      try {
-        const [girlRes, boyRes, neutralRes] = await Promise.all([
-          fetch(`${BASE_URL}/api/baby-names?gender=girl`),
-          fetch(`${BASE_URL}/api/baby-names?gender=boy`),
-          fetch(`${BASE_URL}/api/baby-names?gender=neutral`),
-        ]);
+    setLoading(true);
+    setError(null);
 
-        const [girlData, boyData, neutralData] = await Promise.all([
-          girlRes.json(),
-          boyRes.json(),
-          neutralRes.json(),
-        ]);
+    try {
+      const authToken = localStorage.getItem('authToken');
+      const response = await fetch(`${BASE_URL}/api/names/suggest`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          gender: selectedGender,
+          excludeNames,
+        }),
+      });
 
-        setNamePool({
-          girl: girlData.names || [],
-          boy: boyData.names || [],
-          neutral: neutralData.names || [],
-        });
-      } catch (err) {
-        console.error('NameGenerator: failed to fetch name pools', err);
-      } finally {
-        setLoading(false);
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to generate suggestions');
+        return;
       }
-    };
 
-    fetchAllPools();
-  }, []);
-
-  function handleGenerate() {
-    const pool = namePool[selectedGender];
-    if (!pool || pool.length === 0) return;
-
-    const seen = seenNames.current[selectedGender];
-    let unseen = pool.filter((n) => !seen.has(n.name));
-
-    if (unseen.length === 0) {
-      seen.clear();
-      unseen = pool;
+      onBankFilled(data.suggestions);
+      setPrompt('');
+    } catch (err) {
+      console.error('NameGenerator: suggestion request failed', err);
+      setError('Failed to connect to server');
+    } finally {
+      setLoading(false);
     }
-
-    const pick = unseen[Math.floor(Math.random() * unseen.length)];
-    seen.add(pick.name);
-    onGenerate(pick.name);
   }
 
   function getToggleClass(gender) {
@@ -91,6 +77,8 @@ export default function NameGenerator({ onGenerate }) {
     boy: 'bg-blue-500 hover:bg-blue-600 text-white',
   }[selectedGender];
 
+  const isDisabled = loading || bankHasItems;
+
   return (
     <div className="mb-4 space-y-2">
       {/* Gender toggle row */}
@@ -118,15 +106,39 @@ export default function NameGenerator({ onGenerate }) {
         </button>
       </div>
 
+      {/* Style prompt input */}
+      <input
+        type="text"
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && !isDisabled && handleSubmit()}
+        placeholder="e.g. vintage botanical, strong, Irish..."
+        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground text-sm"
+      />
+
       {/* Generate button */}
       <button
         type="button"
-        onClick={handleGenerate}
-        disabled={loading || namePool[selectedGender].length === 0}
-        className={`${generateButtonClass} w-full mt-3 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
+        onClick={handleSubmit}
+        disabled={isDisabled || !prompt.trim()}
+        className={`${generateButtonClass} w-full mt-1 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
       >
-        Generate Name
+        {loading ? 'Generating...' : 'Generate Names'}
       </button>
+
+      {/* Disabled hint when bank has items */}
+      {bankHasItems && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-1">
+          Add or dismiss your suggestions first
+        </p>
+      )}
+
+      {/* Inline error */}
+      {error && (
+        <p className="text-xs text-red-600 dark:text-red-400 text-center mt-1">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
