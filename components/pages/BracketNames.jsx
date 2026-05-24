@@ -4,6 +4,7 @@ import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { DragDropContext } from '@hello-pangea/dnd';
 import NameGenerator from '@/components/bracket/NameGenerator';
+import AiNameBank from '@/components/bracket/AiNameBank';
 import DraggableNameList from '@/components/bracket/DraggableNameList';
 import NameBankList from '@/components/bracket/NameBankList';
 import { useUser } from '@/contexts/UserContext';
@@ -67,6 +68,10 @@ export default function BracketNamesPage({ params }) {
   // Bank names (names beyond the 16-slot active list)
   const [owner1BankNames, setOwner1BankNames] = useState([]);
   const [owner2BankNames, setOwner2BankNames] = useState([]);
+
+  // AI suggestion banks (ephemeral staging area, local state only)
+  const [owner1AiBank, setOwner1AiBank] = useState([]);
+  const [owner2AiBank, setOwner2AiBank] = useState([]);
 
   const MAX_NAMES = 16;
 
@@ -550,6 +555,62 @@ export default function BracketNamesPage({ params }) {
     handleReorder('Owner 2', newActive, newBank);
   };
 
+  // Compute excluded names per owner (inline — not stored in state)
+  const owner1ExcludeNames = [
+    ...owner1Names.map(n => n.name),
+    ...owner1BankNames.map(n => n.name),
+    ...sharedNames.map(n => n.name),
+  ];
+  const owner2ExcludeNames = [
+    ...owner2Names.map(n => n.name),
+    ...owner2BankNames.map(n => n.name),
+    ...sharedNames.map(n => n.name),
+  ];
+
+  // AI bank handlers — Owner 1
+  const handleOwner1BankFilled = (suggestions) => setOwner1AiBank(suggestions);
+  const handleOwner1AiDismiss = (name) => setOwner1AiBank(prev => prev.filter(s => s.name !== name));
+  const handleOwner1AiAdd = async (name) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/names`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, owner: 'Owner 1', bracketId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        console.error('Failed to add AI name:', data.error || 'Unknown error');
+        return;
+      }
+      setOwner1AiBank(prev => prev.filter(s => s.name !== name));
+      await fetchBracketData();
+    } catch (err) {
+      console.error('Error adding AI name:', err);
+    }
+  };
+
+  // AI bank handlers — Owner 2
+  const handleOwner2BankFilled = (suggestions) => setOwner2AiBank(suggestions);
+  const handleOwner2AiDismiss = (name) => setOwner2AiBank(prev => prev.filter(s => s.name !== name));
+  const handleOwner2AiAdd = async (name) => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/names`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, owner: 'Owner 2', bracketId }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        console.error('Failed to add AI name:', data.error || 'Unknown error');
+        return;
+      }
+      setOwner2AiBank(prev => prev.filter(s => s.name !== name));
+      await fetchBracketData();
+    } catch (err) {
+      console.error('Error adding AI name:', err);
+    }
+  };
+
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
@@ -620,7 +681,17 @@ export default function BracketNamesPage({ params }) {
             {/* Input Form or Locked State */}
             {!owner1LockedIn ? (
               <>
-                <NameGenerator onGenerate={(name) => setOwner1Input(name)} />
+                <NameGenerator
+                  bracketId={bracketId}
+                  excludeNames={owner1ExcludeNames}
+                  onBankFilled={handleOwner1BankFilled}
+                  bankHasItems={owner1AiBank.length > 0}
+                />
+                <AiNameBank
+                  suggestions={owner1AiBank}
+                  onAdd={handleOwner1AiAdd}
+                  onDismiss={handleOwner1AiDismiss}
+                />
                 <form onSubmit={handleAddOwner1} className="mb-4">
                   <input
                     type="text"
@@ -872,7 +943,17 @@ export default function BracketNamesPage({ params }) {
                 {/* Input Form or Locked State */}
                 {!owner2LockedIn ? (
                   <>
-                    <NameGenerator onGenerate={(name) => setOwner2Input(name)} />
+                    <NameGenerator
+                      bracketId={bracketId}
+                      excludeNames={owner2ExcludeNames}
+                      onBankFilled={handleOwner2BankFilled}
+                      bankHasItems={owner2AiBank.length > 0}
+                    />
+                    <AiNameBank
+                      suggestions={owner2AiBank}
+                      onAdd={handleOwner2AiAdd}
+                      onDismiss={handleOwner2AiDismiss}
+                    />
                     <form onSubmit={handleAddOwner2} className="mb-4">
                       <input
                         type="text"
