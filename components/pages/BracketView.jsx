@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
+import { useRouter } from 'next/navigation';
 import BracketView from '@/components/bracket/BracketView';
 import BracketListView from '@/components/bracket/BracketListView';
 import { advanceTournamentRound } from '@/utils/api';
@@ -24,6 +25,7 @@ const ROUND_KEY_MAP = {
 export default function BracketIdPage({ params, shareToken = null }) {
   // Next.js 15 async params pattern
   const { id: bracketId } = use(params);
+  const router = useRouter();
 
   // Role is sourced from UserContext (backed by localStorage under 'userType')
   const { userType: viewerRole, token, user, isOwner } = useUser();
@@ -348,6 +350,16 @@ export default function BracketIdPage({ params, shareToken = null }) {
   }
   if (error) return <div className="min-h-screen flex items-center justify-center text-red-600">Error: {error}</div>;
   if (!bracket) return null;
+
+  // Status guards — redirect owners away from the bracket view during voting/preview phases
+  if (bracket.status === 'voting') {
+    router.replace(`/bracket/${bracketId}/voting`);
+    return null;
+  }
+  if (bracket.status === 'preview') {
+    router.replace(`/bracket/${bracketId}/preview`);
+    return null;
+  }
 
   const allNamesList = [
     ...(bracket.owner1Names || []),
