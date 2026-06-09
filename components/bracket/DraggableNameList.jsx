@@ -20,6 +20,8 @@ function getEffectiveRank(item, sharedNames) {
  *   isLocked     — boolean; disables drag when true
  *   onRemove(id) — callback
  *   sharedNames  — passed through for getEffectiveRank
+ *   suggestions  — array of { nameId, suggestion } for inline resolution
+ *   onResolve    — callback(nameId, action, replacementName?)
  */
 export default function DraggableNameList({
   names,
@@ -28,6 +30,8 @@ export default function DraggableNameList({
   isLocked,
   onRemove,
   sharedNames = [],
+  suggestions = [],
+  onResolve,
 }) {
   return (
     <Droppable droppableId={droppableId} isDropDisabled={isLocked || !isOwner}>
@@ -46,68 +50,96 @@ export default function DraggableNameList({
               index={index}
               isDragDisabled={isLocked || !isOwner}
             >
-              {(dragProvided, dragSnapshot) => (
-                <div
-                  ref={dragProvided.innerRef}
-                  {...dragProvided.draggableProps}
-                  {...dragProvided.dragHandleProps}
-                  style={{
-                    ...(dragProvided.draggableProps.style || {}),
-                    touchAction: 'none',
-                  }}
-                  className={`flex items-center justify-between px-3 py-2 rounded-lg select-none ${
-                    item.isShared
-                      ? 'bg-purple-50 dark:bg-purple-900/30 border-2 border-purple-300 dark:border-purple-700'
-                      : 'bg-gray-50 dark:bg-gray-800'
-                  } ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-blue-400' : ''} ${isOwner && !isLocked ? 'cursor-grab active:cursor-grabbing' : ''}`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    {/* Drag handle icon — visual indicator only; drag events handled by outer div */}
-                    {isOwner && !isLocked && (
-                      <span
-                        className="text-gray-400 dark:text-gray-500 flex-shrink-0"
-                        title="Drag to reorder"
-                        aria-hidden="true"
-                      >
-                        <svg width="12" height="20" viewBox="0 0 12 20" fill="currentColor">
-                          <circle cx="4" cy="4" r="1.5" />
-                          <circle cx="8" cy="4" r="1.5" />
-                          <circle cx="4" cy="10" r="1.5" />
-                          <circle cx="8" cy="10" r="1.5" />
-                          <circle cx="4" cy="16" r="1.5" />
-                          <circle cx="8" cy="16" r="1.5" />
-                        </svg>
-                      </span>
-                    )}
-                    {/* Rank badge */}
-                    <span
-                      className={`text-xs font-bold px-2 py-1 rounded flex-shrink-0 ${
-                        item.isShared
-                          ? 'text-purple-600 dark:text-purple-400 bg-purple-200 dark:bg-purple-900/60'
-                          : 'text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700'
-                      }`}
-                    >
-                      #{getEffectiveRank(item, sharedNames)}
-                    </span>
-                    <div className="flex items-center gap-1 min-w-0">
-                      {item.isShared && (
-                        <span className="text-purple-500 flex-shrink-0" title="Shared Favorite">
-                          💜
+              {(dragProvided, dragSnapshot) => {
+                const suggestion = suggestions.find(s => s.nameId === item.id);
+                return (
+                  <div
+                    ref={dragProvided.innerRef}
+                    {...dragProvided.draggableProps}
+                    {...dragProvided.dragHandleProps}
+                    style={{
+                      ...(dragProvided.draggableProps.style || {}),
+                      touchAction: 'none',
+                    }}
+                    className={`flex flex-col px-3 py-2 rounded-lg select-none ${
+                      suggestion
+                        ? 'bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-600'
+                        : item.isShared
+                          ? 'bg-purple-50 dark:bg-purple-900/30 border-2 border-purple-300 dark:border-purple-700'
+                          : 'bg-gray-50 dark:bg-gray-800'
+                    } ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-blue-400' : ''} ${isOwner && !isLocked ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {/* Drag handle icon — visual indicator only; drag events handled by outer div */}
+                        {isOwner && !isLocked && (
+                          <span
+                            className="text-gray-400 dark:text-gray-500 flex-shrink-0"
+                            title="Drag to reorder"
+                            aria-hidden="true"
+                          >
+                            <svg width="12" height="20" viewBox="0 0 12 20" fill="currentColor">
+                              <circle cx="4" cy="4" r="1.5" />
+                              <circle cx="8" cy="4" r="1.5" />
+                              <circle cx="4" cy="10" r="1.5" />
+                              <circle cx="8" cy="10" r="1.5" />
+                              <circle cx="4" cy="16" r="1.5" />
+                              <circle cx="8" cy="16" r="1.5" />
+                            </svg>
+                          </span>
+                        )}
+                        {/* Rank badge */}
+                        <span
+                          className={`text-xs font-bold px-2 py-1 rounded flex-shrink-0 ${
+                            item.isShared
+                              ? 'text-purple-600 dark:text-purple-400 bg-purple-200 dark:bg-purple-900/60'
+                              : 'text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700'
+                          }`}
+                        >
+                          #{getEffectiveRank(item, sharedNames)}
                         </span>
+                        <div className="flex items-center gap-1 min-w-0">
+                          {item.isShared && (
+                            <span className="text-purple-500 flex-shrink-0" title="Shared Favorite">
+                              💜
+                            </span>
+                          )}
+                          <span className="text-foreground truncate">{item.name}</span>
+                        </div>
+                      </div>
+                      {isOwner && !isLocked && (
+                        <button
+                          onClick={() => onRemove(item.id)}
+                          className="text-red-500 hover:text-red-700 font-medium text-sm flex-shrink-0 ml-2"
+                        >
+                          Remove
+                        </button>
                       )}
-                      <span className="text-foreground truncate">{item.name}</span>
                     </div>
+                    {suggestion && (
+                      <div className="flex flex-col gap-1 mt-1 w-full">
+                        <span className="text-xs text-yellow-600 dark:text-yellow-400">
+                          Partner suggests: <strong>{suggestion.suggestion}</strong>
+                        </span>
+                        <div className="flex gap-2 mt-1">
+                          <button
+                            onClick={() => onResolve(item.id, 'replace', suggestion.suggestion)}
+                            className="px-3 py-1 bg-yellow-500 text-white text-xs font-semibold rounded-lg hover:bg-yellow-600"
+                          >
+                            Accept: {suggestion.suggestion}
+                          </button>
+                          <button
+                            onClick={() => onResolve(item.id, 'keep')}
+                            className="px-3 py-1 bg-gray-500 text-white text-xs font-semibold rounded-lg hover:bg-gray-600"
+                          >
+                            Keep Original
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  {isOwner && !isLocked && (
-                    <button
-                      onClick={() => onRemove(item.id)}
-                      className="text-red-500 hover:text-red-700 font-medium text-sm flex-shrink-0 ml-2"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-              )}
+                );
+              }}
             </Draggable>
           ))}
           {provided.placeholder}

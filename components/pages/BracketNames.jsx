@@ -77,11 +77,11 @@ export default function BracketNamesPage({ params }) {
   const [owner1AiBank, setOwner1AiBank] = useState([]);
   const [owner2AiBank, setOwner2AiBank] = useState([]);
 
-  // Hated/suggested names awaiting resolution (populated from GET /api/bracket/votes)
-  const [hatedNames, setHatedNames] = useState([]);
+  // Suggested names awaiting inline resolution (populated from GET /api/bracket/votes)
   const [suggestedNames, setSuggestedNames] = useState([]);
-  const [resolvingNameId, setResolvingNameId] = useState(null);
-  const [replaceInputs, setReplaceInputs] = useState({});
+
+  // Permanently-dropped hated names bank (populated from bracket data)
+  const [hatedNamesBank, setHatedNamesBank] = useState([]);
 
   // Dismissed AI suggestion names for the logged-in owner (persisted to DB)
   const [dismissedNames, setDismissedNames] = useState([]);
@@ -226,6 +226,7 @@ export default function BracketNamesPage({ params }) {
 
           setOwner1LockedIn(data.owner1LockedIn || false);
           setOwner2LockedIn(data.owner2LockedIn || false);
+          setHatedNamesBank(data.hatedNamesBank || []);
           setBracketStatus(data.status || 'draft');
 
           if (data.status === 'voting' && !showHatedPanel) {
@@ -256,7 +257,7 @@ export default function BracketNamesPage({ params }) {
     }
   }, [apiConnected]);
 
-  // Fetch hated/suggested names from the latest vote round (used when ?hated=true)
+  // Fetch suggested names from the latest vote round (used when ?hated=true)
   const fetchVoteOutcomes = async () => {
     const authToken = localStorage.getItem('authToken');
     try {
@@ -269,25 +270,14 @@ export default function BracketNamesPage({ params }) {
       if (cycles.length === 0) return;
       const myOwnerId = ownerRole; // 'owner1' | 'owner2'
 
-      // Hated names: find the most recent cycle that has any hate votes
-      const hateCycle = [...cycles].reverse().find(c =>
-        (c.votes || []).some(v => v.reaction === 'hate')
-      ) || null;
       // Suggested names: like+suggestion votes are pre-filled into the latest cycle
       const suggestionCycle = cycles[cycles.length - 1];
 
-      // Hated names are names in MY list that the OTHER owner voted 'hate' on
-      const hated = hateCycle
-        ? (hateCycle.votes || [])
-            .filter(v => v.voterId !== myOwnerId && v.reaction === 'hate')
-            .map(v => v.nameId)
-        : [];
       // Suggested names: OTHER owner liked one of MY names and suggested a replacement
       const suggested = (suggestionCycle.votes || [])
         .filter(v => v.voterId !== myOwnerId && v.reaction === 'like' && v.suggestion)
         .map(v => ({ nameId: v.nameId, suggestion: v.suggestion }));
 
-      setHatedNames(hated);
       setSuggestedNames(suggested);
     } catch (err) {
       console.error('fetchVoteOutcomes error:', err);
@@ -507,8 +497,13 @@ export default function BracketNamesPage({ params }) {
 
       if (response.ok) {
         const data = await response.json();
-        if (data.status === 'voting') {
+        // Only redirect to /voting when transitioning from draft (not when re-locking during inline resolution)
+        if (data.status === 'voting' && !showHatedPanel) {
           router.push(`/bracket/${bracketId}/voting`);
+          return;
+        }
+        if (data.status === 'preview') {
+          router.push(`/bracket/${bracketId}/preview`);
           return;
         }
         await fetchBracketData();
@@ -521,9 +516,8 @@ export default function BracketNamesPage({ params }) {
     }
   };
 
-  // Resolve a hated or suggested name (drop / keep / replace)
+  // Resolve a suggested name (keep / replace)
   const handleResolveName = async (nameId, action, replacementName = null) => {
-    setResolvingNameId(nameId);
     const authToken = localStorage.getItem('authToken');
     try {
       const res = await fetch(`${BASE_URL}/api/bracket/votes/resolve-name`, {
@@ -544,8 +538,6 @@ export default function BracketNamesPage({ params }) {
       }
     } catch (err) {
       console.error('Error resolving name:', err);
-    } finally {
-      setResolvingNameId(null);
     }
   };
 
@@ -689,6 +681,7 @@ export default function BracketNamesPage({ params }) {
     ...owner1AiBank.map(n => n.name),
     ...sharedNames.map(n => n.name),
     ...(isOwner1 ? dismissedNames : []),
+    ...hatedNamesBank.filter(h => h.ownerId === 'owner1').map(h => h.value),
   ];
   const owner2ExcludeNames = [
     ...owner2Names.map(n => n.name),
@@ -696,6 +689,7 @@ export default function BracketNamesPage({ params }) {
     ...owner2AiBank.map(n => n.name),
     ...sharedNames.map(n => n.name),
     ...(isOwner2 ? dismissedNames : []),
+    ...hatedNamesBank.filter(h => h.ownerId === 'owner2').map(h => h.value),
   ];
 
   // AI bank handlers — Owner 1
@@ -809,7 +803,7 @@ export default function BracketNamesPage({ params }) {
           )}
 
           {/* Go to Tournament Button */}
-          {owner1LockedIn && owner2LockedIn && !showHatedPanel && (
+          {owner1LockedIn && owner2LockedIn && bracketStatus === 'active' && (
             <div className="mt-6">
               <Link
                 href={`/bracket/${bracketId}`}
@@ -824,115 +818,6 @@ export default function BracketNamesPage({ params }) {
           )}
         </div>
 
-        {/* Hated / Suggested Names Panel — shown when redirected back from voting phase */}
-        {showHatedPanel && (hatedNames.length > 0 || suggestedNames.length > 0) && (
-          <div className="mb-10 bg-red-50 dark:bg-red-900/20 border-2 border-red-400 dark:border-red-600 rounded-lg p-6">
-            <h2 className="text-xl font-bold text-red-700 dark:text-red-400 mb-2">
-              Names Awaiting Your Decision
-            </h2>
-            <p className="text-sm text-red-600 dark:text-red-400 mb-6">
-              Your partner reacted to some of your names. Choose what to do with each one before the preview.
-            </p>
-
-            {hatedNames.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide mb-3">
-                  Hated by your partner
-                </h3>
-                <div className="space-y-3">
-                  {hatedNames.map(nameId => {
-                    const ownerNames = ownerRole === 'owner1' ? owner1Names : owner2Names;
-                    const nameObj = ownerNames.find(n => n.id === nameId);
-                    const nameValue = nameObj?.name || nameId;
-                    const isResolving = resolvingNameId === nameId;
-                    return (
-                      <div key={nameId} className="flex flex-col gap-3 p-4 bg-white dark:bg-gray-900 border-2 border-red-300 dark:border-red-700 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <span className="font-medium text-foreground">{nameValue}</span>
-                          <span className="text-xs text-red-500 uppercase font-bold">hated</span>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            onClick={() => handleResolveName(nameId, 'keep')}
-                            disabled={isResolving}
-                            className="px-4 py-2 bg-gray-600 text-white text-sm font-semibold rounded-lg hover:bg-gray-700 disabled:opacity-50"
-                          >
-                            Keep It
-                          </button>
-                          <button
-                            onClick={() => handleResolveName(nameId, 'drop')}
-                            disabled={isResolving}
-                            className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 disabled:opacity-50"
-                          >
-                            Drop It
-                          </button>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={replaceInputs[nameId] || ''}
-                              onChange={e => setReplaceInputs(prev => ({ ...prev, [nameId]: e.target.value }))}
-                              placeholder="Replace with..."
-                              className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
-                            <button
-                              onClick={() => handleResolveName(nameId, 'replace', replaceInputs[nameId])}
-                              disabled={isResolving || !replaceInputs[nameId]?.trim()}
-                              className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-                            >
-                              Replace
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {suggestedNames.length > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold text-yellow-600 dark:text-yellow-400 uppercase tracking-wide mb-3">
-                  Alternative suggestions from your partner
-                </h3>
-                <div className="space-y-3">
-                  {suggestedNames.map(({ nameId, suggestion }) => {
-                    const ownerNames = ownerRole === 'owner1' ? owner1Names : owner2Names;
-                    const nameObj = ownerNames.find(n => n.id === nameId);
-                    const nameValue = nameObj?.name || nameId;
-                    const isResolving = resolvingNameId === nameId;
-                    return (
-                      <div key={nameId} className="flex flex-col gap-3 p-4 bg-white dark:bg-gray-900 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <span className="font-medium text-foreground">{nameValue}</span>
-                          <span className="text-xs text-yellow-600 dark:text-yellow-400">Partner suggests:</span>
-                          <span className="font-semibold text-yellow-700 dark:text-yellow-300">{suggestion}</span>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleResolveName(nameId, 'keep')}
-                            disabled={isResolving}
-                            className="px-4 py-2 bg-gray-600 text-white text-sm font-semibold rounded-lg hover:bg-gray-700 disabled:opacity-50"
-                          >
-                            Keep Original
-                          </button>
-                          <button
-                            onClick={() => handleResolveName(nameId, 'replace', suggestion)}
-                            disabled={isResolving}
-                            className="px-4 py-2 bg-yellow-600 text-white text-sm font-semibold rounded-lg hover:bg-yellow-700 disabled:opacity-50"
-                          >
-                            Use Suggestion
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Three Column Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Owner 1 Column */}
@@ -945,7 +830,7 @@ export default function BracketNamesPage({ params }) {
             </p>
 
             {/* Input Form or Locked State */}
-            {!showHatedPanel && (!owner1LockedIn ? (
+            {(!owner1LockedIn || showHatedPanel) ? (
               <>
                 <NameGenerator
                   bracketId={bracketId}
@@ -1006,7 +891,7 @@ export default function BracketNamesPage({ params }) {
                   {owner2LockedIn ? 'Both parents ready! Bracket is active.' : `Waiting for ${owner2DisplayName} to lock in...`}
                 </p>
               </div>
-            ))}
+            )}
 
             {/* Names List */}
             {(!isOwner2 || (owner1LockedIn && owner2LockedIn)) ? (
@@ -1035,6 +920,7 @@ export default function BracketNamesPage({ params }) {
 
                 {/* Draggable active list (owner) or static list (observer) */}
                 {isOwner1 ? (
+                  <>
                   <DragDropContext onDragEnd={handleOwner1DragEnd}>
                     <DraggableNameList
                       names={owner1Names.slice().sort((a, b) => getEffectiveRank(a, sharedNames) - getEffectiveRank(b, sharedNames))}
@@ -1043,6 +929,8 @@ export default function BracketNamesPage({ params }) {
                       isLocked={!showHatedPanel && owner1LockedIn}
                       onRemove={handleDeleteName}
                       sharedNames={sharedNames}
+                      suggestions={showHatedPanel ? suggestedNames : []}
+                      onResolve={handleResolveName}
                     />
                     <NameBankList
                       bankNames={owner1BankNames}
@@ -1052,6 +940,23 @@ export default function BracketNamesPage({ params }) {
                       onRemove={handleDeleteName}
                     />
                   </DragDropContext>
+                  {showHatedPanel && hatedNamesBank.filter(h => h.ownerId === 'owner1').length > 0 && (
+                    <div className="mt-4">
+                      <h3 className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide mb-2">
+                        Hated Names (removed by partner)
+                      </h3>
+                      <div className="space-y-2">
+                        {hatedNamesBank.filter(h => h.ownerId === 'owner1').map(h => (
+                          <div key={h.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700">
+                            <span className="text-xs font-bold text-red-500 uppercase">Removed</span>
+                            <span className="text-foreground line-through text-sm">{h.value}</span>
+                            <span className="text-xs text-red-400 italic ml-auto">hated by partner</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  </>
                 ) : (
                   <div className="space-y-2">
                     {owner1Names
@@ -1209,7 +1114,7 @@ export default function BracketNamesPage({ params }) {
             ) : (
               <>
                 {/* Input Form or Locked State */}
-                {!showHatedPanel && (!owner2LockedIn ? (
+                {(!owner2LockedIn || showHatedPanel) ? (
                   <>
                     <NameGenerator
                       bracketId={bracketId}
@@ -1270,7 +1175,7 @@ export default function BracketNamesPage({ params }) {
                       {owner1LockedIn ? 'Both parents ready! Bracket is active.' : `Waiting for ${owner1DisplayName} to lock in...`}
                     </p>
                   </div>
-                ))}
+                )}
 
                 {/* Names List */}
                 {(!isOwner1 || (owner1LockedIn && owner2LockedIn)) ? (
@@ -1299,6 +1204,7 @@ export default function BracketNamesPage({ params }) {
 
                     {/* Draggable active list (owner) or static list (observer) */}
                     {isOwner2 ? (
+                      <>
                       <DragDropContext onDragEnd={handleOwner2DragEnd}>
                         <DraggableNameList
                           names={owner2Names.slice().sort((a, b) => getEffectiveRank(a, sharedNames) - getEffectiveRank(b, sharedNames))}
@@ -1307,6 +1213,8 @@ export default function BracketNamesPage({ params }) {
                           isLocked={!showHatedPanel && owner2LockedIn}
                           onRemove={handleDeleteName}
                           sharedNames={sharedNames}
+                          suggestions={showHatedPanel ? suggestedNames : []}
+                          onResolve={handleResolveName}
                         />
                         <NameBankList
                           bankNames={owner2BankNames}
@@ -1316,6 +1224,23 @@ export default function BracketNamesPage({ params }) {
                           onRemove={handleDeleteName}
                         />
                       </DragDropContext>
+                      {showHatedPanel && hatedNamesBank.filter(h => h.ownerId === 'owner2').length > 0 && (
+                        <div className="mt-4">
+                          <h3 className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide mb-2">
+                            Hated Names (removed by partner)
+                          </h3>
+                          <div className="space-y-2">
+                            {hatedNamesBank.filter(h => h.ownerId === 'owner2').map(h => (
+                              <div key={h.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700">
+                                <span className="text-xs font-bold text-red-500 uppercase">Removed</span>
+                                <span className="text-foreground line-through text-sm">{h.value}</span>
+                                <span className="text-xs text-red-400 italic ml-auto">hated by partner</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      </>
                     ) : (
                       <div className="space-y-2">
                         {owner2Names
