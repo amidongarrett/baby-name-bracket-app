@@ -267,15 +267,23 @@ export default function BracketNamesPage({ params }) {
       const data = await res.json();
       const cycles = data.cycles || [];
       if (cycles.length === 0) return;
-      const latestCycle = cycles[cycles.length - 1];
       const myOwnerId = ownerRole; // 'owner1' | 'owner2'
 
+      // Hated names: find the most recent cycle that has any hate votes
+      const hateCycle = [...cycles].reverse().find(c =>
+        (c.votes || []).some(v => v.reaction === 'hate')
+      ) || null;
+      // Suggested names: like+suggestion votes are pre-filled into the latest cycle
+      const suggestionCycle = cycles[cycles.length - 1];
+
       // Hated names are names in MY list that the OTHER owner voted 'hate' on
-      const hated = (latestCycle.votes || [])
-        .filter(v => v.voterId !== myOwnerId && v.reaction === 'hate')
-        .map(v => v.nameId);
+      const hated = hateCycle
+        ? (hateCycle.votes || [])
+            .filter(v => v.voterId !== myOwnerId && v.reaction === 'hate')
+            .map(v => v.nameId)
+        : [];
       // Suggested names: OTHER owner liked one of MY names and suggested a replacement
-      const suggested = (latestCycle.votes || [])
+      const suggested = (suggestionCycle.votes || [])
         .filter(v => v.voterId !== myOwnerId && v.reaction === 'like' && v.suggestion)
         .map(v => ({ nameId: v.nameId, suggestion: v.suggestion }));
 
@@ -1032,7 +1040,7 @@ export default function BracketNamesPage({ params }) {
                       names={owner1Names.slice().sort((a, b) => getEffectiveRank(a, sharedNames) - getEffectiveRank(b, sharedNames))}
                       droppableId="owner1-active"
                       isOwner={true}
-                      isLocked={owner1LockedIn}
+                      isLocked={!showHatedPanel && owner1LockedIn}
                       onRemove={handleDeleteName}
                       sharedNames={sharedNames}
                     />
@@ -1040,7 +1048,7 @@ export default function BracketNamesPage({ params }) {
                       bankNames={owner1BankNames}
                       droppableId="owner1-bank"
                       isOwner={true}
-                      isLocked={owner1LockedIn}
+                      isLocked={!showHatedPanel && owner1LockedIn}
                       onRemove={handleDeleteName}
                     />
                   </DragDropContext>
@@ -1296,7 +1304,7 @@ export default function BracketNamesPage({ params }) {
                           names={owner2Names.slice().sort((a, b) => getEffectiveRank(a, sharedNames) - getEffectiveRank(b, sharedNames))}
                           droppableId="owner2-active"
                           isOwner={true}
-                          isLocked={owner2LockedIn}
+                          isLocked={!showHatedPanel && owner2LockedIn}
                           onRemove={handleDeleteName}
                           sharedNames={sharedNames}
                         />
@@ -1304,7 +1312,7 @@ export default function BracketNamesPage({ params }) {
                           bankNames={owner2BankNames}
                           droppableId="owner2-bank"
                           isOwner={true}
-                          isLocked={owner2LockedIn}
+                          isLocked={!showHatedPanel && owner2LockedIn}
                           onRemove={handleDeleteName}
                         />
                       </DragDropContext>
