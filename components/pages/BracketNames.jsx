@@ -809,7 +809,7 @@ export default function BracketNamesPage({ params }) {
           )}
 
           {/* Go to Tournament Button */}
-          {owner1LockedIn && owner2LockedIn && (
+          {owner1LockedIn && owner2LockedIn && !showHatedPanel && (
             <div className="mt-6">
               <Link
                 href={`/bracket/${bracketId}`}
@@ -945,7 +945,7 @@ export default function BracketNamesPage({ params }) {
             </p>
 
             {/* Input Form or Locked State */}
-            {!owner1LockedIn ? (
+            {!showHatedPanel && (!owner1LockedIn ? (
               <>
                 <NameGenerator
                   bracketId={bracketId}
@@ -1006,7 +1006,7 @@ export default function BracketNamesPage({ params }) {
                   {owner2LockedIn ? 'Both parents ready! Bracket is active.' : `Waiting for ${owner2DisplayName} to lock in...`}
                 </p>
               </div>
-            )}
+            ))}
 
             {/* Names List */}
             {(!isOwner2 || (owner1LockedIn && owner2LockedIn)) ? (
@@ -1209,7 +1209,7 @@ export default function BracketNamesPage({ params }) {
             ) : (
               <>
                 {/* Input Form or Locked State */}
-                {!owner2LockedIn ? (
+                {!showHatedPanel && (!owner2LockedIn ? (
                   <>
                     <NameGenerator
                       bracketId={bracketId}
@@ -1270,7 +1270,7 @@ export default function BracketNamesPage({ params }) {
                       {owner1LockedIn ? 'Both parents ready! Bracket is active.' : `Waiting for ${owner1DisplayName} to lock in...`}
                     </p>
                   </div>
-                )}
+                ))}
 
                 {/* Names List */}
                 {(!isOwner1 || (owner1LockedIn && owner2LockedIn)) ? (
