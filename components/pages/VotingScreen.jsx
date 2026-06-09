@@ -11,8 +11,8 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 export default function VotingScreen({ params }) {
   const { id: bracketId } = use(params);
   const router = useRouter();
-  const { token } = useUser();
-  const { ownerRole } = useBracket();
+  const { token, user } = useUser();
+  useBracket();
 
   const [bracket, setBracket] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -22,6 +22,13 @@ export default function VotingScreen({ params }) {
 
   // Map<nameId, { reaction: 'love'|'like'|'hate'|null, suggestion: string|null }>
   const [reactions, setReactions] = useState({});
+
+  const ownerRole = (() => {
+    if (!bracket || !user) return null;
+    if (user.id === bracket.owner1UserId) return 'owner1';
+    if (user.id === bracket.owner2UserId) return 'owner2';
+    return null;
+  })();
 
   // The names belonging to the OTHER owner — the ones this owner votes on
   const otherOwnerNames = (() => {

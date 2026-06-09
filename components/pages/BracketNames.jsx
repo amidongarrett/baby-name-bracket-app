@@ -228,6 +228,11 @@ export default function BracketNamesPage({ params }) {
           setOwner2LockedIn(data.owner2LockedIn || false);
           setBracketStatus(data.status || 'draft');
 
+          if (data.status === 'voting' && !showHatedPanel) {
+            router.push(`/bracket/${bracketId}/voting`);
+            return;
+          }
+
           setOwner1DisplayName(data.owner1Name || 'Owner 1');
           setOwner2DisplayName(data.owner2Name || 'Owner 2');
           setOwner1Icon(data.owner1Icon || '👤');
