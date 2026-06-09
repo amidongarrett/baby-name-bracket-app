@@ -10,10 +10,17 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 export default function VotingPreviewScreen({ params }) {
   const { id: bracketId } = use(params);
   const router = useRouter();
-  const { token } = useUser();
-  const { ownerRole } = useBracket();
+  const { token, user } = useUser();
+  const { setCurrentBracket } = useBracket();
 
   const [bracket, setBracket] = useState(null);
+
+  const ownerRole = (() => {
+    if (!bracket || !user) return null;
+    if (user.id === bracket.owner1UserId) return 'owner1';
+    if (user.id === bracket.owner2UserId) return 'owner2';
+    return null;
+  })();
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [waitingForPartner, setWaitingForPartner] = useState(false);
@@ -30,6 +37,7 @@ export default function VotingPreviewScreen({ params }) {
       if (!res.ok) throw new Error('Failed to fetch bracket');
       const data = await res.json();
       setBracket(data);
+      setCurrentBracket(data);
     } catch (err) {
       setErrorMsg(err.message);
     } finally {
